@@ -18,6 +18,7 @@ export default function AdminPage() {
   const [fetching, setFetching] = useState(true);
   const [error, setError] = useState('');
   const [copiedToken, setCopiedToken] = useState<string | null>(null);
+  const [copiedBlindToken, setCopiedBlindToken] = useState<string | null>(null);
 
   const fetchSurveys = useCallback(async () => {
     setFetching(true);
@@ -66,28 +67,34 @@ export default function AdminPage() {
     }
   };
 
-  const getSurveyUrl = (token: string) => {
-    if (typeof window !== 'undefined') {
-      return `${window.location.origin}/survey/${token}`;
-    }
-    return `/survey/${token}`;
+  const getSurveyUrl = (token: string, blind = false) => {
+    const base = typeof window !== 'undefined' ? window.location.origin : '';
+    return `${base}/survey/${token}${blind ? '?blind=1' : ''}`;
   };
 
-  const handleCopyLink = async (token: string) => {
+  const copyToClipboard = async (text: string) => {
     try {
-      await navigator.clipboard.writeText(getSurveyUrl(token));
-      setCopiedToken(token);
-      setTimeout(() => setCopiedToken(null), 2000);
+      await navigator.clipboard.writeText(text);
     } catch {
       const el = document.createElement('textarea');
-      el.value = getSurveyUrl(token);
+      el.value = text;
       document.body.appendChild(el);
       el.select();
       document.execCommand('copy');
       document.body.removeChild(el);
-      setCopiedToken(token);
-      setTimeout(() => setCopiedToken(null), 2000);
     }
+  };
+
+  const handleCopyLink = async (token: string) => {
+    await copyToClipboard(getSurveyUrl(token));
+    setCopiedToken(token);
+    setTimeout(() => setCopiedToken(null), 2000);
+  };
+
+  const handleCopyBlindLink = async (token: string) => {
+    await copyToClipboard(getSurveyUrl(token, true));
+    setCopiedBlindToken(token);
+    setTimeout(() => setCopiedBlindToken(null), 2000);
   };
 
   const formatDate = (dateStr: string) => {
@@ -201,7 +208,7 @@ export default function AdminPage() {
                     </div>
 
                     {/* Actions */}
-                    <div className="flex items-center gap-2 flex-shrink-0">
+                    <div className="flex flex-wrap items-center gap-2 flex-shrink-0">
                       <button
                         onClick={() => handleCopyLink(survey.token)}
                         className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-slate-300 text-slate-600 rounded-lg hover:bg-slate-100 transition"
@@ -219,6 +226,26 @@ export default function AdminPage() {
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
                             </svg>
                             リンクコピー
+                          </>
+                        )}
+                      </button>
+                      <button
+                        onClick={() => handleCopyBlindLink(survey.token)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-purple-300 text-purple-600 rounded-lg hover:bg-purple-50 transition"
+                      >
+                        {copiedBlindToken === survey.token ? (
+                          <>
+                            <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                            <span className="text-green-600">コピー済み</span>
+                          </>
+                        ) : (
+                          <>
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                            </svg>
+                            バイアスなし
                           </>
                         )}
                       </button>

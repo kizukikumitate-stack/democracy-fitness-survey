@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useParams } from 'next/navigation';
+import { useState, useEffect, useMemo } from 'react';
+import { useParams, useSearchParams } from 'next/navigation';
 import Logo from '@/components/Logo';
 import { LAYER1_QUESTIONS, LAYER2_QUESTIONS, MUSCLES, Question } from '@/lib/questions';
 
@@ -11,11 +11,21 @@ type PageState = 'loading' | 'not_found' | 'part1' | 'part2' | 'submitting' | 'd
 
 const SCORE_LABELS = ['', '全くそう思わない', 'そう思わない', 'どちらともいえない', 'そう思う', '強くそう思う'];
 
-function QuestionCard({ question, value, onChange, index }: {
+function shuffle<T>(arr: T[]): T[] {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function QuestionCard({ question, value, onChange, index, blind }: {
   question: Question;
   value: number | undefined;
   onChange: (id: string, score: number) => void;
   index: number;
+  blind: boolean;
 }) {
   const muscle = MUSCLES[question.muscleIndex];
   const muscleColors = [
@@ -39,16 +49,17 @@ function QuestionCard({ question, value, onChange, index }: {
           {index + 1}
         </span>
         <div className="flex-1">
-          <span className={`inline-block text-xs font-medium px-2 py-0.5 rounded-full mb-2 ${colorClass}`}>
-            {muscle.name}
-          </span>
+          {!blind && (
+            <span className={`inline-block text-xs font-medium px-2 py-0.5 rounded-full mb-2 ${colorClass}`}>
+              {muscle.name}
+            </span>
+          )}
           <p className="text-slate-800 text-sm sm:text-base leading-relaxed">
             {question.text}
           </p>
         </div>
       </div>
 
-      {/* Score selector */}
       <div className="flex gap-2 flex-wrap justify-center sm:justify-start mt-3">
         {[1, 2, 3, 4, 5].map(score => (
           <label key={score} className="cursor-pointer">
@@ -76,7 +87,6 @@ function QuestionCard({ question, value, onChange, index }: {
         ))}
       </div>
 
-      {/* Selected label on mobile */}
       {value !== undefined && (
         <p className="text-xs text-blue-600 mt-2 sm:hidden">
           選択: {SCORE_LABELS[value]}
@@ -86,7 +96,7 @@ function QuestionCard({ question, value, onChange, index }: {
   );
 }
 
-// Group questions by muscle
+// Group questions by muscle (used in normal mode)
 function groupByMuscle(questions: Question[]) {
   const groups: { muscle: typeof MUSCLES[0]; questions: Question[] }[] = [];
   MUSCLES.forEach(muscle => {
@@ -100,13 +110,19 @@ function groupByMuscle(questions: Question[]) {
 
 export default function SurveyPage() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const token = params.token as string;
+  const blind = searchParams.get('blind') === '1';
 
   const [pageState, setPageState] = useState<PageState>('loading');
   const [organizationName, setOrganizationName] = useState('');
   const [respondentName, setRespondentName] = useState('');
   const [respondentDate, setRespondentDate] = useState('');
   const [answers, setAnswers] = useState<Answers>({});
+
+  // Shuffled orders for blind mode (stable per session)
+  const shuffledPart1 = useMemo(() => blind ? shuffle(LAYER1_QUESTIONS) : LAYER1_QUESTIONS, [blind]);
+  const shuffledPart2 = useMemo(() => blind ? shuffle(LAYER2_QUESTIONS) : LAYER2_QUESTIONS, [blind]);
 
   useEffect(() => {
     const fetchSurvey = async () => {
@@ -218,7 +234,7 @@ export default function SurveyPage() {
   }
 
   const isPartOne = pageState === 'part1';
-  const currentQuestions = isPartOne ? LAYER1_QUESTIONS : LAYER2_QUESTIONS;
+  const currentQuestions = isPartOne ? shuffledPart1 : shuffledPart2;
   const currentAnsweredCount = isPartOne ? part1AnsweredCount : part2AnsweredCount;
   const totalQuestions = currentQuestions.length;
   const progressPct = Math.round((currentAnsweredCount / totalQuestions) * 100);
@@ -336,33 +352,51 @@ export default function SurveyPage() {
           </div>
         </div>
 
-        {/* Questions grouped by muscle */}
-        <div className="space-y-8">
-          {groups.map(group => (
-            <div key={group.muscle.index}>
-              <div className="flex items-center gap-2 mb-3">
-                <h2 className="font-semibold text-slate-700">
-                  {group.muscle.name}
-                  <span className="ml-2 text-xs font-normal text-slate-400">({group.muscle.nameEn})</span>
-                </h2>
+        {/* Questions */}
+        {blind ? (
+          // Blind mode: flat list, no muscle grouping/headers
+          <div className="space-y-3">
+            {currentQuestions.map((q, i) => (
+              <QuestionCard
+                key={q.id}
+                question={q}
+                value={answers[q.id]}
+                onChange={handleAnswer}
+                index={i}
+                blind={true}
+              />
+            ))}
+          </div>
+        ) : (
+          // Normal mode: grouped by muscle with headers
+          <div className="space-y-8">
+            {groups.map(group => (
+              <div key={group.muscle.index}>
+                <div className="flex items-center gap-2 mb-3">
+                  <h2 className="font-semibold text-slate-700">
+                    {group.muscle.name}
+                    <span className="ml-2 text-xs font-normal text-slate-400">({group.muscle.nameEn})</span>
+                  </h2>
+                </div>
+                <div className="space-y-3">
+                  {group.questions.map((q) => {
+                    const globalIndex = currentQuestions.indexOf(q);
+                    return (
+                      <QuestionCard
+                        key={q.id}
+                        question={q}
+                        value={answers[q.id]}
+                        onChange={handleAnswer}
+                        index={globalIndex}
+                        blind={false}
+                      />
+                    );
+                  })}
+                </div>
               </div>
-              <div className="space-y-3">
-                {group.questions.map((q) => {
-                  const globalIndex = currentQuestions.indexOf(q);
-                  return (
-                    <QuestionCard
-                      key={q.id}
-                      question={q}
-                      value={answers[q.id]}
-                      onChange={handleAnswer}
-                      index={globalIndex}
-                    />
-                  );
-                })}
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
 
         {/* Navigation */}
         <div className="sticky bottom-0 mt-8 pb-4">
