@@ -342,7 +342,7 @@ export default function SurveyPage() {
                   <p className="text-xs text-slate-400">次へ進むと組織評価になります</p>
                 </div>
                 <button
-                  onClick={() => setPageState('part2')}
+                  onClick={() => { setPageState('part2'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
                   disabled={!part1Answered}
                   className="px-6 py-2.5 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition"
                 >
@@ -353,7 +353,7 @@ export default function SurveyPage() {
               <div className="flex items-center justify-between">
                 <div className="flex gap-2">
                   <button
-                    onClick={() => setPageState('part1')}
+                    onClick={() => { setPageState('part1'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
                     className="px-4 py-2 border border-slate-300 text-slate-600 rounded-lg text-sm hover:bg-slate-100 transition"
                   >
                     ← Part 1 に戻る
