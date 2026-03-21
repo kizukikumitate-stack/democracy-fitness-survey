@@ -120,9 +120,9 @@ export default function SurveyPage() {
   const [respondentDate, setRespondentDate] = useState('');
   const [answers, setAnswers] = useState<Answers>({});
 
-  // Shuffled orders for blind mode (stable per session)
-  const shuffledPart1 = useMemo(() => blind ? shuffle(LAYER1_QUESTIONS) : LAYER1_QUESTIONS, [blind]);
-  const shuffledPart2 = useMemo(() => blind ? shuffle(LAYER2_QUESTIONS) : LAYER2_QUESTIONS, [blind]);
+  // Shuffle questions every session (both normal and blind mode)
+  const shuffledPart1 = useMemo(() => shuffle(LAYER1_QUESTIONS), []);
+  const shuffledPart2 = useMemo(() => shuffle(LAYER2_QUESTIONS), []);
 
   useEffect(() => {
     const fetchSurvey = async () => {
