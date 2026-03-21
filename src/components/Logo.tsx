@@ -5,7 +5,7 @@ interface LogoProps {
   showSubtitle?: boolean;
 }
 
-export default function Logo({ size = 'md', showSubtitle = false }: LogoProps) {
+export default function Logo({ size = 'md' }: LogoProps) {
   const titleSizes = {
     sm: 'text-lg',
     md: 'text-2xl',
