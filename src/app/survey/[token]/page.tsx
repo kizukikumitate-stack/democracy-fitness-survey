@@ -363,8 +363,8 @@ export default function SurveyPage() {
         </div>
 
         {/* Questions */}
-        {blind ? (
-          // Blind mode: flat list, no muscle grouping/headers
+        {(blind || behavior) ? (
+          // Blind/behavior mode: flat list, no muscle grouping/headers
           <div className="space-y-3">
             {currentQuestions.map((q, i) => (
               <QuestionCard
