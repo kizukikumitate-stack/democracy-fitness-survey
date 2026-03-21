@@ -105,6 +105,7 @@ export default function SurveyPage() {
   const [pageState, setPageState] = useState<PageState>('loading');
   const [organizationName, setOrganizationName] = useState('');
   const [respondentName, setRespondentName] = useState('');
+  const [respondentDate, setRespondentDate] = useState('');
   const [answers, setAnswers] = useState<Answers>({});
 
   useEffect(() => {
@@ -143,6 +144,7 @@ export default function SurveyPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           respondentName: respondentName.trim() || '匿名',
+          respondentDate: respondentDate || '',
           answers,
         }),
       });
@@ -261,6 +263,23 @@ export default function SurveyPage() {
       </header>
 
       <main className="max-w-3xl mx-auto px-4 sm:px-6 py-6">
+        {/* Intro message (only on part1) */}
+        {isPartOne && (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-5 mb-6">
+            <div className="flex gap-3">
+              <span className="text-2xl flex-shrink-0">💪</span>
+              <div>
+                <p className="text-sm text-amber-800 leading-relaxed">
+                  このサーベイは、ダイエットと同じく、<span className="font-semibold">現在の状態を把握し、改善していくため</span>のものです。
+                </p>
+                <p className="text-sm text-amber-700 mt-1 leading-relaxed">
+                  できるだけバイアスが生まれないよう、深く考えすぎず<span className="font-semibold">直感を大切に</span>回答してください。
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Part description */}
         <div className={`rounded-xl p-5 mb-6 border ${isPartOne ? 'bg-blue-50 border-blue-100' : 'bg-green-50 border-green-100'}`}>
           <h1 className={`text-lg font-bold mb-1 ${isPartOne ? 'text-blue-800' : 'text-green-800'}`}>
@@ -273,19 +292,34 @@ export default function SurveyPage() {
           </p>
         </div>
 
-        {/* Name input (only on part1) */}
+        {/* Name & Date input (only on part1) */}
         {isPartOne && (
           <div className="bg-white rounded-xl border border-slate-200 p-5 mb-6">
-            <label className="block text-sm font-medium text-slate-700 mb-2">
-              お名前（任意）
-            </label>
-            <input
-              type="text"
-              value={respondentName}
-              onChange={e => setRespondentName(e.target.value)}
-              placeholder="匿名でも回答できます"
-              className="w-full sm:w-80 px-4 py-2.5 border border-slate-300 rounded-lg text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
-            />
+            <div className="flex flex-col sm:flex-row gap-4">
+              <div className="flex-1">
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  お名前（任意）
+                </label>
+                <input
+                  type="text"
+                  value={respondentName}
+                  onChange={e => setRespondentName(e.target.value)}
+                  placeholder="匿名でも回答できます"
+                  className="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+                />
+              </div>
+              <div className="flex-1">
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  日付（任意）
+                </label>
+                <input
+                  type="date"
+                  value={respondentDate}
+                  onChange={e => setRespondentDate(e.target.value)}
+                  className="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+                />
+              </div>
+            </div>
           </div>
         )}
 
