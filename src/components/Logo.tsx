@@ -7,14 +7,19 @@ interface LogoProps {
 
 export default function Logo({ size = 'md', showSubtitle = false }: LogoProps) {
   const titleSizes = {
-    sm: 'text-base',
-    md: 'text-xl',
-    lg: 'text-3xl',
+    sm: 'text-lg',
+    md: 'text-2xl',
+    lg: 'text-4xl',
   };
-  const subtitleSizes = {
+  const brandSizes = {
     sm: 'text-xs',
-    md: 'text-sm',
-    lg: 'text-base',
+    md: 'text-xs',
+    lg: 'text-sm',
+  };
+  const blockSize = {
+    sm: 'w-2 h-2',
+    md: 'w-2.5 h-2.5',
+    lg: 'w-3 h-3',
   };
 
   return (
@@ -22,24 +27,24 @@ export default function Logo({ size = 'md', showSubtitle = false }: LogoProps) {
       {/* Colorful block logo */}
       <div className="flex-shrink-0">
         <div className="grid grid-cols-2 gap-0.5">
-          <div className={`${size === 'lg' ? 'w-5 h-5' : size === 'md' ? 'w-4 h-4' : 'w-3 h-3'} bg-blue-600 rounded-sm`}></div>
-          <div className={`${size === 'lg' ? 'w-5 h-5' : size === 'md' ? 'w-4 h-4' : 'w-3 h-3'} bg-red-600 rounded-sm`}></div>
-          <div className={`${size === 'lg' ? 'w-5 h-5' : size === 'md' ? 'w-4 h-4' : 'w-3 h-3'} bg-yellow-500 rounded-sm`}></div>
-          <div className={`${size === 'lg' ? 'w-5 h-5' : size === 'md' ? 'w-4 h-4' : 'w-3 h-3'} bg-green-600 rounded-sm`}></div>
+          <div className={`${blockSize[size]} bg-blue-600 rounded-sm`}></div>
+          <div className={`${blockSize[size]} bg-red-600 rounded-sm`}></div>
+          <div className={`${blockSize[size]} bg-yellow-500 rounded-sm`}></div>
+          <div className={`${blockSize[size]} bg-green-600 rounded-sm`}></div>
         </div>
       </div>
       <div>
+        {/* メインタイトル：デモクラ筋診断 */}
         <div className={`font-bold text-gray-800 leading-tight ${titleSizes[size]}`}>
-          <span className="text-blue-600">きづき</span>
-          <span className="text-red-600">くみ</span>
-          <span className="text-yellow-600">たて</span>
-          <span className="text-green-600">工房</span>
+          デモクラ筋診断
         </div>
-        {showSubtitle && (
-          <div className={`text-gray-500 ${subtitleSizes[size]}`}>
-            デモクラシーフィットネス診断
-          </div>
-        )}
+        {/* サブ：きづきくみたて工房 */}
+        <div className={`text-gray-400 ${brandSizes[size]}`}>
+          <span className="text-blue-500">きづき</span>
+          <span className="text-red-500">くみ</span>
+          <span className="text-yellow-500">たて</span>
+          <span className="text-green-500">工房</span>
+        </div>
       </div>
     </div>
   );
