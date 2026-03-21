@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Logo from '@/components/Logo';
 import SurveyRadarChart from '@/components/SurveyRadarChart';
 import QuadrantMatrix from '@/components/QuadrantMatrix';
-import { MUSCLES } from '@/lib/questions';
+import { MUSCLES, QUESTIONS, transformScore } from '@/lib/questions';
 
 interface MuscleScore {
   muscleIndex: number;
@@ -16,6 +16,21 @@ interface MuscleScore {
 interface ResultsData {
   organizationName: string;
   responseCount: number;
+  scores: MuscleScore[];
+}
+
+interface RawResponse {
+  id: string;
+  survey_token: string;
+  respondent_name: string | null;
+  answers: Record<string, number>;
+  created_at: string;
+}
+
+interface IndividualResult {
+  id: string;
+  name: string;
+  createdAt: string;
   scores: MuscleScore[];
 }
 
@@ -49,20 +64,103 @@ function getQuadrantLabel(q: string) {
   }
 }
 
+function computeScores(answers: Record<string, number>): MuscleScore[] {
+  return MUSCLES.map(muscle => {
+    const layer1Questions = QUESTIONS.filter(q => q.muscleIndex === muscle.index && q.layer === 1);
+    const layer2Questions = QUESTIONS.filter(q => q.muscleIndex === muscle.index && q.layer === 2);
+
+    const individualScores = layer1Questions.map(q => transformScore(answers[q.id] ?? 3, q.reversed));
+    const individual = individualScores.reduce((sum, s) => sum + s, 0) / individualScores.length;
+
+    const orgScores = layer2Questions.map(q => transformScore(answers[q.id] ?? 3, q.reversed));
+    const organization = orgScores.reduce((sum, s) => sum + s, 0) / orgScores.length;
+
+    return { muscleIndex: muscle.index, muscleName: muscle.name, individual, organization };
+  });
+}
+
+function ScoreTable({ scores }: { scores: MuscleScore[] }) {
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full">
+        <thead>
+          <tr className="bg-slate-50">
+            <th className="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">筋肉</th>
+            <th className="text-center px-4 py-3 text-xs font-medium text-blue-600 uppercase tracking-wider">個人</th>
+            <th className="text-center px-4 py-3 text-xs font-medium text-green-600 uppercase tracking-wider">組織</th>
+            <th className="text-center px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">診断</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-slate-100">
+          {scores.map(score => {
+            const quadrant = getQuadrant(score.individual, score.organization);
+            const qColors = QUADRANT_COLORS[quadrant];
+            return (
+              <tr key={score.muscleIndex} className="hover:bg-slate-50 transition">
+                <td className="px-4 py-2.5">
+                  <div className="font-medium text-slate-800 text-sm">{MUSCLES[score.muscleIndex].name}</div>
+                  <div className="text-xs text-slate-400">{MUSCLES[score.muscleIndex].nameEn}</div>
+                </td>
+                <td className="px-4 py-2.5 text-center">
+                  <div className="flex items-center justify-center gap-2">
+                    <div className="w-16 h-2 bg-slate-200 rounded-full overflow-hidden">
+                      <div className="h-full bg-blue-500 rounded-full" style={{ width: `${(score.individual / 5) * 100}%` }} />
+                    </div>
+                    <span className="text-sm font-semibold text-blue-600 w-8 text-right">{score.individual.toFixed(2)}</span>
+                  </div>
+                </td>
+                <td className="px-4 py-2.5 text-center">
+                  <div className="flex items-center justify-center gap-2">
+                    <div className="w-16 h-2 bg-slate-200 rounded-full overflow-hidden">
+                      <div className="h-full bg-green-500 rounded-full" style={{ width: `${(score.organization / 5) * 100}%` }} />
+                    </div>
+                    <span className="text-sm font-semibold text-green-600 w-8 text-right">{score.organization.toFixed(2)}</span>
+                  </div>
+                </td>
+                <td className="px-4 py-2.5 text-center">
+                  <span className={`inline-block text-xs font-medium px-2 py-1 rounded-full ${qColors.badge}`}>
+                    {getQuadrantLabel(quadrant)}
+                  </span>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 export default function ResultsClient({ token, organizationName }: Props) {
   const [results, setResults] = useState<ResultsData | null>(null);
+  const [individuals, setIndividuals] = useState<IndividualResult[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [tab, setTab] = useState<'org' | 'individual'>('org');
+  const [openId, setOpenId] = useState<string | null>(null);
 
   useEffect(() => {
-    const fetchResults = async () => {
+    const fetchAll = async () => {
       try {
-        const res = await fetch(`/api/results/${token}`);
-        if (res.ok) {
-          const data = await res.json();
-          setResults(data);
+        const [resOrg, resRaw] = await Promise.all([
+          fetch(`/api/results/${token}`),
+          fetch(`/api/responses/${token}`),
+        ]);
+        if (resOrg.ok) {
+          setResults(await resOrg.json());
         } else {
           setError('結果の取得に失敗しました');
+        }
+        if (resRaw.ok) {
+          const raw: RawResponse[] = await resRaw.json();
+          setIndividuals(
+            raw.map(r => ({
+              id: r.id,
+              name: r.respondent_name || '匿名',
+              createdAt: r.created_at,
+              scores: computeScores(r.answers),
+            }))
+          );
         }
       } catch {
         setError('通信エラーが発生しました');
@@ -70,8 +168,11 @@ export default function ResultsClient({ token, organizationName }: Props) {
         setLoading(false);
       }
     };
-    fetchResults();
+    fetchAll();
   }, [token]);
+
+  const formatDate = (dateStr: string) =>
+    new Date(dateStr).toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' });
 
   if (loading) {
     return (
@@ -102,7 +203,6 @@ export default function ResultsClient({ token, organizationName }: Props) {
     organization: Math.round(s.organization * 100) / 100,
   }));
 
-  // Group by quadrant
   const quadrantGroups = {
     both_high: results.scores.filter(s => getQuadrant(s.individual, s.organization) === 'both_high'),
     org_low: results.scores.filter(s => getQuadrant(s.individual, s.organization) === 'org_low'),
@@ -115,32 +215,22 @@ export default function ResultsClient({ token, organizationName }: Props) {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      {/* Header */}
       <header className="bg-white border-b border-slate-200 shadow-sm">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
           <Logo size="md" showSubtitle />
-          <a
-            href="/"
-            className="text-sm text-slate-500 hover:text-slate-700 transition"
-          >
-            管理画面へ
-          </a>
+          <a href="/" className="text-sm text-slate-500 hover:text-slate-700 transition">管理画面へ</a>
         </div>
       </header>
 
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
         {/* Title */}
-        <div className="mb-8">
-          <h1 className="text-2xl font-bold text-slate-800 mb-1">
-            {organizationName}
-          </h1>
-          <p className="text-slate-500 text-sm">
-            デモクラシーフィットネス診断 結果レポート
-          </p>
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold text-slate-800 mb-1">{organizationName}</h1>
+          <p className="text-slate-500 text-sm">デモクラシーフィットネス診断 結果レポート</p>
         </div>
 
         {/* Summary cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
           <div className="bg-white rounded-xl border border-slate-200 p-4 text-center">
             <div className="text-3xl font-bold text-blue-600">{results.responseCount}</div>
             <div className="text-xs text-slate-500 mt-1">回答者数</div>
@@ -159,147 +249,189 @@ export default function ResultsClient({ token, organizationName }: Props) {
           </div>
         </div>
 
-        {results.responseCount === 0 ? (
-          <div className="bg-white rounded-xl border border-slate-200 p-12 text-center">
-            <p className="text-slate-500">まだ回答がありません。</p>
-            <p className="text-slate-400 text-sm mt-2">サーベイリンクを共有して回答を集めてください。</p>
-          </div>
-        ) : (
+        {/* Tabs */}
+        <div className="flex gap-1 bg-slate-100 rounded-lg p-1 mb-6 w-fit">
+          <button
+            onClick={() => setTab('org')}
+            className={`px-5 py-2 rounded-md text-sm font-medium transition ${
+              tab === 'org' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            組織全体
+          </button>
+          <button
+            onClick={() => setTab('individual')}
+            className={`px-5 py-2 rounded-md text-sm font-medium transition ${
+              tab === 'individual' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            個人別
+            <span className="ml-1.5 text-xs bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded-full">
+              {individuals.length}
+            </span>
+          </button>
+        </div>
+
+        {/* ===== 組織全体タブ ===== */}
+        {tab === 'org' && (
           <>
-            {/* Radar Chart */}
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 mb-6">
-              <h2 className="text-lg font-semibold text-slate-800 mb-1">レーダーチャート</h2>
-              <p className="text-sm text-slate-500 mb-4">10筋肉の個人平均（青）と組織平均（緑）</p>
-              <SurveyRadarChart data={radarData} />
-            </div>
-
-            {/* Quadrant Matrix */}
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 mb-6">
-              <h2 className="text-lg font-semibold text-slate-800 mb-1">4象限マトリクス</h2>
-              <p className="text-sm text-slate-500 mb-4">横軸=個人スコア、縦軸=組織スコア（中心=3.0）</p>
-              <QuadrantMatrix data={matrixData} />
-
-              {/* Quadrant explanation */}
-              <div className="mt-6 grid grid-cols-2 gap-3">
-                <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-                  <div className="font-semibold text-green-800 text-sm mb-1">右上：発揮できている</div>
-                  <p className="text-green-700 text-xs">個人の力が高く、組織環境も整っている</p>
-                  <div className="mt-2 flex flex-wrap gap-1">
-                    {quadrantGroups.both_high.map(s => (
-                      <span key={s.muscleIndex} className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">
-                        {MUSCLES[s.muscleIndex].name}
-                      </span>
-                    ))}
-                    {quadrantGroups.both_high.length === 0 && <span className="text-xs text-green-600">-</span>}
-                  </div>
-                </div>
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                  <div className="font-semibold text-blue-800 text-sm mb-1">右下：環境が阻害中</div>
-                  <p className="text-blue-700 text-xs">個人の力はあるが、組織環境が整っていない</p>
-                  <div className="mt-2 flex flex-wrap gap-1">
-                    {quadrantGroups.org_low.map(s => (
-                      <span key={s.muscleIndex} className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">
-                        {MUSCLES[s.muscleIndex].name}
-                      </span>
-                    ))}
-                    {quadrantGroups.org_low.length === 0 && <span className="text-xs text-blue-600">-</span>}
-                  </div>
-                </div>
-                <div className="bg-orange-50 border border-orange-200 rounded-lg p-3">
-                  <div className="font-semibold text-orange-800 text-sm mb-1">左上：個人が課題</div>
-                  <p className="text-orange-700 text-xs">組織環境は整っているが、個人の力が課題</p>
-                  <div className="mt-2 flex flex-wrap gap-1">
-                    {quadrantGroups.individual_low.map(s => (
-                      <span key={s.muscleIndex} className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">
-                        {MUSCLES[s.muscleIndex].name}
-                      </span>
-                    ))}
-                    {quadrantGroups.individual_low.length === 0 && <span className="text-xs text-orange-600">-</span>}
-                  </div>
-                </div>
-                <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                  <div className="font-semibold text-red-800 text-sm mb-1">左下：両方に課題</div>
-                  <p className="text-red-700 text-xs">個人・組織の両方で強化が必要</p>
-                  <div className="mt-2 flex flex-wrap gap-1">
-                    {quadrantGroups.both_low.map(s => (
-                      <span key={s.muscleIndex} className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full">
-                        {MUSCLES[s.muscleIndex].name}
-                      </span>
-                    ))}
-                    {quadrantGroups.both_low.length === 0 && <span className="text-xs text-red-600">-</span>}
-                  </div>
-                </div>
+            {results.responseCount === 0 ? (
+              <div className="bg-white rounded-xl border border-slate-200 p-12 text-center">
+                <p className="text-slate-500">まだ回答がありません。</p>
+                <p className="text-slate-400 text-sm mt-2">サーベイリンクを共有して回答を集めてください。</p>
               </div>
-            </div>
+            ) : (
+              <>
+                <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 mb-6">
+                  <h2 className="text-lg font-semibold text-slate-800 mb-1">レーダーチャート</h2>
+                  <p className="text-sm text-slate-500 mb-4">10筋肉の個人平均（青）と組織平均（緑）</p>
+                  <SurveyRadarChart data={radarData} />
+                </div>
 
-            {/* Score table */}
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden mb-6">
-              <div className="px-6 py-4 border-b border-slate-100">
-                <h2 className="text-lg font-semibold text-slate-800">筋肉別スコア一覧</h2>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="bg-slate-50">
-                      <th className="text-left px-6 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">筋肉</th>
-                      <th className="text-center px-4 py-3 text-xs font-medium text-blue-600 uppercase tracking-wider">個人スコア</th>
-                      <th className="text-center px-4 py-3 text-xs font-medium text-green-600 uppercase tracking-wider">組織スコア</th>
-                      <th className="text-center px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">診断</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {results.scores.map(score => {
-                      const quadrant = getQuadrant(score.individual, score.organization);
-                      const qColors = QUADRANT_COLORS[quadrant];
-                      return (
-                        <tr key={score.muscleIndex} className="hover:bg-slate-50 transition">
-                          <td className="px-6 py-3">
-                            <div className="font-medium text-slate-800 text-sm">{MUSCLES[score.muscleIndex].name}</div>
-                            <div className="text-xs text-slate-400">{MUSCLES[score.muscleIndex].nameEn}</div>
-                          </td>
-                          <td className="px-4 py-3 text-center">
-                            <div className="flex items-center justify-center gap-2">
-                              <div className="w-24 h-2 bg-slate-200 rounded-full overflow-hidden">
-                                <div
-                                  className="h-full bg-blue-500 rounded-full"
-                                  style={{ width: `${(score.individual / 5) * 100}%` }}
-                                />
-                              </div>
-                              <span className="text-sm font-semibold text-blue-600 w-8 text-right">
-                                {score.individual.toFixed(2)}
-                              </span>
-                            </div>
-                          </td>
-                          <td className="px-4 py-3 text-center">
-                            <div className="flex items-center justify-center gap-2">
-                              <div className="w-24 h-2 bg-slate-200 rounded-full overflow-hidden">
-                                <div
-                                  className="h-full bg-green-500 rounded-full"
-                                  style={{ width: `${(score.organization / 5) * 100}%` }}
-                                />
-                              </div>
-                              <span className="text-sm font-semibold text-green-600 w-8 text-right">
-                                {score.organization.toFixed(2)}
-                              </span>
-                            </div>
-                          </td>
-                          <td className="px-4 py-3 text-center">
-                            <span className={`inline-block text-xs font-medium px-2 py-1 rounded-full ${qColors.badge}`}>
-                              {getQuadrantLabel(quadrant)}
-                            </span>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+                <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 mb-6">
+                  <h2 className="text-lg font-semibold text-slate-800 mb-1">4象限マトリクス</h2>
+                  <p className="text-sm text-slate-500 mb-4">横軸=個人スコア、縦軸=組織スコア（中心=3.0）</p>
+                  <QuadrantMatrix data={matrixData} />
+                  <div className="mt-6 grid grid-cols-2 gap-3">
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                      <div className="font-semibold text-green-800 text-sm mb-1">右上：発揮できている</div>
+                      <p className="text-green-700 text-xs">個人の力が高く、組織環境も整っている</p>
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        {quadrantGroups.both_high.map(s => (
+                          <span key={s.muscleIndex} className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">{MUSCLES[s.muscleIndex].name}</span>
+                        ))}
+                        {quadrantGroups.both_high.length === 0 && <span className="text-xs text-green-600">-</span>}
+                      </div>
+                    </div>
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                      <div className="font-semibold text-blue-800 text-sm mb-1">右下：環境が阻害中</div>
+                      <p className="text-blue-700 text-xs">個人の力はあるが、組織環境が整っていない</p>
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        {quadrantGroups.org_low.map(s => (
+                          <span key={s.muscleIndex} className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">{MUSCLES[s.muscleIndex].name}</span>
+                        ))}
+                        {quadrantGroups.org_low.length === 0 && <span className="text-xs text-blue-600">-</span>}
+                      </div>
+                    </div>
+                    <div className="bg-orange-50 border border-orange-200 rounded-lg p-3">
+                      <div className="font-semibold text-orange-800 text-sm mb-1">左上：個人が課題</div>
+                      <p className="text-orange-700 text-xs">組織環境は整っているが、個人の力が課題</p>
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        {quadrantGroups.individual_low.map(s => (
+                          <span key={s.muscleIndex} className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">{MUSCLES[s.muscleIndex].name}</span>
+                        ))}
+                        {quadrantGroups.individual_low.length === 0 && <span className="text-xs text-orange-600">-</span>}
+                      </div>
+                    </div>
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                      <div className="font-semibold text-red-800 text-sm mb-1">左下：両方に課題</div>
+                      <p className="text-red-700 text-xs">個人・組織の両方で強化が必要</p>
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        {quadrantGroups.both_low.map(s => (
+                          <span key={s.muscleIndex} className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full">{MUSCLES[s.muscleIndex].name}</span>
+                        ))}
+                        {quadrantGroups.both_low.length === 0 && <span className="text-xs text-red-600">-</span>}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden mb-6">
+                  <div className="px-6 py-4 border-b border-slate-100">
+                    <h2 className="text-lg font-semibold text-slate-800">筋肉別スコア一覧</h2>
+                  </div>
+                  <ScoreTable scores={results.scores} />
+                </div>
+              </>
+            )}
           </>
         )}
 
-        {/* Footer */}
-        <div className="text-center py-6 border-t border-slate-200 mt-4">
+        {/* ===== 個人別タブ ===== */}
+        {tab === 'individual' && (
+          <>
+            {individuals.length === 0 ? (
+              <div className="bg-white rounded-xl border border-slate-200 p-12 text-center">
+                <p className="text-slate-500">まだ回答がありません。</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {individuals.map((person) => {
+                  const isOpen = openId === person.id;
+                  const avgInd = person.scores.reduce((s, sc) => s + sc.individual, 0) / person.scores.length;
+                  const avgOrg = person.scores.reduce((s, sc) => s + sc.organization, 0) / person.scores.length;
+                  const personRadar = person.scores.map(s => ({
+                    muscle: MUSCLES[s.muscleIndex].name,
+                    individual: Math.round(s.individual * 100) / 100,
+                    organization: Math.round(s.organization * 100) / 100,
+                  }));
+
+                  return (
+                    <div key={person.id} className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                      {/* Header row — click to toggle */}
+                      <button
+                        onClick={() => setOpenId(isOpen ? null : person.id)}
+                        className="w-full flex items-center justify-between px-6 py-4 hover:bg-slate-50 transition text-left"
+                      >
+                        <div className="flex items-center gap-4">
+                          <div className="w-9 h-9 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold text-sm flex-shrink-0">
+                            {person.name.charAt(0)}
+                          </div>
+                          <div>
+                            <div className="font-semibold text-slate-800">{person.name}</div>
+                            <div className="text-xs text-slate-400">{formatDate(person.createdAt)}</div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-6">
+                          <div className="hidden sm:flex gap-6 text-sm">
+                            <span>個人 <span className="font-bold text-blue-600">{avgInd.toFixed(2)}</span></span>
+                            <span>組織 <span className="font-bold text-green-600">{avgOrg.toFixed(2)}</span></span>
+                          </div>
+                          <svg
+                            className={`w-5 h-5 text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`}
+                            fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                          >
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </div>
+                      </button>
+
+                      {/* Expanded detail */}
+                      {isOpen && (
+                        <div className="border-t border-slate-100 px-6 py-6">
+                          <div className="grid grid-cols-2 gap-4 mb-6">
+                            <div className="bg-blue-50 rounded-lg p-4 text-center">
+                              <div className="text-2xl font-bold text-blue-600">{avgInd.toFixed(2)}</div>
+                              <div className="text-xs text-slate-500 mt-1">個人スコア平均</div>
+                            </div>
+                            <div className="bg-green-50 rounded-lg p-4 text-center">
+                              <div className="text-2xl font-bold text-green-600">{avgOrg.toFixed(2)}</div>
+                              <div className="text-xs text-slate-500 mt-1">組織スコア平均</div>
+                            </div>
+                          </div>
+
+                          <div className="mb-6">
+                            <h3 className="text-sm font-semibold text-slate-700 mb-3">レーダーチャート</h3>
+                            <SurveyRadarChart data={personRadar} />
+                          </div>
+
+                          <div>
+                            <h3 className="text-sm font-semibold text-slate-700 mb-3">筋肉別スコア</h3>
+                            <div className="rounded-lg border border-slate-100 overflow-hidden">
+                              <ScoreTable scores={person.scores} />
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </>
+        )}
+
+        <div className="text-center py-6 border-t border-slate-200 mt-8">
           <Logo size="sm" showSubtitle />
         </div>
       </main>
