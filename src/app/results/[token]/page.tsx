@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation';
-import { getSurveyByToken } from '@/lib/storage';
+import { supabase } from '@/lib/supabase';
 import ResultsClient from './ResultsClient';
 
 interface Props {
@@ -7,10 +7,15 @@ interface Props {
 }
 
 export default async function ResultsPage({ params }: Props) {
-  const survey = getSurveyByToken(params.token);
-  if (!survey) {
+  const { data: survey, error } = await supabase
+    .from('surveys')
+    .select('*')
+    .eq('token', params.token)
+    .single();
+
+  if (error || !survey) {
     notFound();
   }
 
-  return <ResultsClient token={params.token} organizationName={survey.organizationName} />;
+  return <ResultsClient token={params.token} organizationName={survey.organization_name} />;
 }
