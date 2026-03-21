@@ -3,13 +3,14 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import Logo from '@/components/Logo';
-import { LAYER1_QUESTIONS, LAYER2_QUESTIONS, MUSCLES, Question } from '@/lib/questions';
+import { LAYER1_QUESTIONS, LAYER2_QUESTIONS, MUSCLES, Question, BEHAVIORAL_QUESTION_TEXTS } from '@/lib/questions';
 
 type Answers = Record<string, number>;
 
 type PageState = 'loading' | 'not_found' | 'part1' | 'part2' | 'submitting' | 'done' | 'error';
 
-const SCORE_LABELS = ['', '全くそう思わない', 'そう思わない', 'どちらともいえない', 'そう思う', '強くそう思う'];
+const SCORE_LABELS_ATTITUDE = ['', '全くそう思わない', 'そう思わない', 'どちらともいえない', 'そう思う', '強くそう思う'];
+const SCORE_LABELS_BEHAVIOR = ['', '全くなかった', 'ほぼなかった', '時々あった', 'よくあった', '常にあった'];
 
 function shuffle<T>(arr: T[]): T[] {
   const a = [...arr];
@@ -20,13 +21,16 @@ function shuffle<T>(arr: T[]): T[] {
   return a;
 }
 
-function QuestionCard({ question, value, onChange, index, blind }: {
+function QuestionCard({ question, value, onChange, index, blind, behavior }: {
   question: Question;
   value: number | undefined;
   onChange: (id: string, score: number) => void;
   index: number;
   blind: boolean;
+  behavior: boolean;
 }) {
+  const SCORE_LABELS = behavior ? SCORE_LABELS_BEHAVIOR : SCORE_LABELS_ATTITUDE;
+  const questionText = behavior ? (BEHAVIORAL_QUESTION_TEXTS[question.id] ?? question.text) : question.text;
   const muscle = MUSCLES[question.muscleIndex];
   const muscleColors = [
     'bg-blue-100 text-blue-700',
@@ -55,7 +59,7 @@ function QuestionCard({ question, value, onChange, index, blind }: {
             </span>
           )}
           <p className="text-slate-800 text-sm sm:text-base leading-relaxed">
-            {question.text}
+            {questionText}
           </p>
         </div>
       </div>
@@ -81,7 +85,7 @@ function QuestionCard({ question, value, onChange, index, blind }: {
               <span className="text-lg font-bold leading-none">{score}</span>
             </div>
             <p className="text-xs text-center text-slate-400 mt-1 w-12 sm:w-14 leading-tight hidden sm:block">
-              {score === 1 ? '全くそう思わない' : score === 3 ? 'どちらとも' : score === 5 ? '強くそう思う' : ''}
+              {score === 1 ? SCORE_LABELS[1] : score === 3 ? (behavior ? '時々あった' : 'どちらとも') : score === 5 ? SCORE_LABELS[5] : ''}
             </p>
           </label>
         ))}
@@ -113,6 +117,7 @@ export default function SurveyPage() {
   const searchParams = useSearchParams();
   const token = params.token as string;
   const blind = searchParams.get('blind') === '1';
+  const behavior = searchParams.get('behavior') === '1';
 
   const [pageState, setPageState] = useState<PageState>('loading');
   const [organizationName, setOrganizationName] = useState('');
@@ -302,9 +307,14 @@ export default function SurveyPage() {
             {isPartOne ? 'Part 1: 個人評価（30問）' : 'Part 2: 組織評価（30問）'}
           </h1>
           <p className={`text-sm ${isPartOne ? 'text-blue-700' : 'text-green-700'}`}>
-            {isPartOne
-              ? '自分自身の対話力について、日頃の行動を振り返りながら回答してください。'
-              : 'あなたの組織・チームの状況について、実態を踏まえて回答してください。'}
+            {behavior
+              ? (isPartOne
+                  ? 'この半年で、自分が実際に行動したことを振り返りながら回答してください。'
+                  : 'この半年で、組織・チームの中で実際に起きたことを振り返りながら回答してください。')
+              : (isPartOne
+                  ? '自分自身の対話力について、日頃の行動を振り返りながら回答してください。'
+                  : 'あなたの組織・チームの状況について、実態を踏まえて回答してください。')
+            }
           </p>
         </div>
 
@@ -346,7 +356,7 @@ export default function SurveyPage() {
             {[1, 2, 3, 4, 5].map(s => (
               <div key={s} className="flex items-center gap-1.5">
                 <span className="w-6 h-6 bg-slate-100 text-slate-600 rounded text-xs flex items-center justify-center font-bold">{s}</span>
-                <span className="text-xs text-slate-500">{SCORE_LABELS[s]}</span>
+                <span className="text-xs text-slate-500">{behavior ? SCORE_LABELS_BEHAVIOR[s] : SCORE_LABELS_ATTITUDE[s]}</span>
               </div>
             ))}
           </div>
@@ -364,6 +374,7 @@ export default function SurveyPage() {
                 onChange={handleAnswer}
                 index={i}
                 blind={true}
+                behavior={behavior}
               />
             ))}
           </div>
@@ -389,6 +400,7 @@ export default function SurveyPage() {
                         onChange={handleAnswer}
                         index={globalIndex}
                         blind={false}
+                        behavior={behavior}
                       />
                     );
                   })}

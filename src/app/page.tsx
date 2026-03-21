@@ -19,6 +19,7 @@ export default function AdminPage() {
   const [error, setError] = useState('');
   const [copiedToken, setCopiedToken] = useState<string | null>(null);
   const [copiedBlindToken, setCopiedBlindToken] = useState<string | null>(null);
+  const [copiedBehaviorToken, setCopiedBehaviorToken] = useState<string | null>(null);
 
   const fetchSurveys = useCallback(async () => {
     setFetching(true);
@@ -95,6 +96,13 @@ export default function AdminPage() {
     await copyToClipboard(getSurveyUrl(token, true));
     setCopiedBlindToken(token);
     setTimeout(() => setCopiedBlindToken(null), 2000);
+  };
+
+  const handleCopyBehaviorLink = async (token: string) => {
+    const base = typeof window !== 'undefined' ? window.location.origin : '';
+    await copyToClipboard(`${base}/survey/${token}?behavior=1`);
+    setCopiedBehaviorToken(token);
+    setTimeout(() => setCopiedBehaviorToken(null), 2000);
   };
 
   const formatDate = (dateStr: string) => {
@@ -188,27 +196,25 @@ export default function AdminPage() {
             <div className="divide-y divide-slate-100">
               {surveys.map(survey => (
                 <div key={survey.id} className="px-6 py-4 hover:bg-slate-50 transition">
-                  <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                    {/* Info */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-3 mb-1">
-                        <h3 className="font-semibold text-slate-800 truncate">
-                          {survey.organizationName}
-                        </h3>
-                        <span className="flex-shrink-0 inline-flex items-center gap-1 bg-slate-100 text-slate-600 text-xs px-2 py-0.5 rounded-full">
-                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
-                          </svg>
-                          {survey.responseCount}名回答
-                        </span>
-                      </div>
-                      <p className="text-xs text-slate-400">
-                        作成日: {formatDate(survey.createdAt)}
-                      </p>
-                    </div>
+                  {/* Info */}
+                  <div className="flex items-center gap-3 mb-3">
+                    <h3 className="font-semibold text-slate-800 truncate">
+                      {survey.organizationName}
+                    </h3>
+                    <span className="flex-shrink-0 inline-flex items-center gap-1 bg-slate-100 text-slate-600 text-xs px-2 py-0.5 rounded-full">
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                      {survey.responseCount}名回答
+                    </span>
+                    <p className="text-xs text-slate-400 ml-auto">
+                      {formatDate(survey.createdAt)}
+                    </p>
+                  </div>
 
-                    {/* Actions */}
-                    <div className="flex flex-wrap items-center gap-2 flex-shrink-0">
+                  {/* Actions */}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex flex-wrap gap-2 flex-shrink-0">
                       <button
                         onClick={() => handleCopyLink(survey.token)}
                         className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-slate-300 text-slate-600 rounded-lg hover:bg-slate-100 transition"
@@ -226,6 +232,26 @@ export default function AdminPage() {
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
                             </svg>
                             リンクコピー
+                          </>
+                        )}
+                      </button>
+                      <button
+                        onClick={() => handleCopyBehaviorLink(survey.token)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-orange-300 text-orange-600 rounded-lg hover:bg-orange-50 transition"
+                      >
+                        {copiedBehaviorToken === survey.token ? (
+                          <>
+                            <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                            <span className="text-green-600">コピー済み</span>
+                          </>
+                        ) : (
+                          <>
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            行動実績
                           </>
                         )}
                       </button>
