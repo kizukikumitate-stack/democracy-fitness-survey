@@ -18,20 +18,19 @@ export async function GET(
     }
 
     const type = req.nextUrl.searchParams.get('type');
-    let query = supabase
+
+    const { data: allResponses, error: responsesError } = await supabase
       .from('responses')
       .select('*')
       .eq('survey_token', params.token);
 
-    if (type === 'behavior') {
-      query = query.eq('survey_type', 'behavior');
-    } else if (type === 'attitude') {
-      query = query.or('survey_type.eq.attitude,survey_type.is.null');
-    }
-
-    const { data: responses, error: responsesError } = await query;
-
     if (responsesError) throw responsesError;
+
+    const responses = (allResponses || []).filter(r => {
+      if (type === 'behavior') return r.survey_type === 'behavior';
+      if (type === 'attitude') return !r.survey_type || r.survey_type === 'attitude';
+      return true;
+    });
 
     const responseCount = responses?.length ?? 0;
 

@@ -72,23 +72,22 @@ export async function GET(
     }
 
     const type = req.nextUrl.searchParams.get('type');
-    let query = supabase
+
+    const { data: allResponses, error } = await supabase
       .from('responses')
       .select('*')
       .eq('survey_token', params.token)
       .order('created_at', { ascending: true });
 
-    if (type === 'behavior') {
-      query = query.eq('survey_type', 'behavior');
-    } else if (type === 'attitude') {
-      query = query.or('survey_type.eq.attitude,survey_type.is.null');
-    }
-
-    const { data: responses, error } = await query;
-
     if (error) throw error;
 
-    return NextResponse.json(responses || []);
+    const responses = (allResponses || []).filter(r => {
+      if (type === 'behavior') return r.survey_type === 'behavior';
+      if (type === 'attitude') return !r.survey_type || r.survey_type === 'attitude';
+      return true;
+    });
+
+    return NextResponse.json(responses);
   } catch (err) {
     console.error('GET /api/responses/[token] error:', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

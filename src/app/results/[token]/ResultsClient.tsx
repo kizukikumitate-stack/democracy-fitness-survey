@@ -163,6 +163,290 @@ function ScoreTable({ scores, avgScores }: { scores: MuscleScore[]; avgScores?: 
   );
 }
 
+// ===== フィードバック生成 =====
+
+type FeedbackType = 'strength' | 'growth' | 'above_avg' | 'below_avg' | 'org_gap' | 'ind_gap';
+
+interface FeedbackItem {
+  type: FeedbackType;
+  message: string;
+}
+
+interface FeedbackGroup {
+  title: string;
+  items: FeedbackItem[];
+}
+
+const FEEDBACK_STYLES: Record<FeedbackType, { label: string; labelColor: string; border: string; bg: string; text: string }> = {
+  strength:  { label: '強み',     labelColor: 'bg-blue-600 text-white',    border: 'border-blue-200', bg: 'bg-blue-50',   text: 'text-blue-900' },
+  growth:    { label: '成長ポイント', labelColor: 'bg-yellow-500 text-white', border: 'border-yellow-200', bg: 'bg-yellow-50', text: 'text-yellow-900' },
+  above_avg: { label: '平均以上',  labelColor: 'bg-green-600 text-white',   border: 'border-green-200', bg: 'bg-green-50',  text: 'text-green-900' },
+  below_avg: { label: '要強化',   labelColor: 'bg-red-500 text-white',     border: 'border-red-200',   bg: 'bg-red-50',    text: 'text-red-900' },
+  org_gap:   { label: '環境ギャップ', labelColor: 'bg-purple-600 text-white', border: 'border-purple-200', bg: 'bg-purple-50', text: 'text-purple-900' },
+  ind_gap:   { label: '実践ギャップ', labelColor: 'bg-cyan-600 text-white',  border: 'border-cyan-200',  bg: 'bg-cyan-50',   text: 'text-cyan-900' },
+};
+
+function generateFeedback(personScores: MuscleScore[], avgScores?: MuscleScore[]): FeedbackGroup[] {
+  const ownAvgInd = personScores.reduce((s, sc) => s + sc.individual, 0) / personScores.length;
+
+  // ---- 個人内比較（他の筋肉と比べて） ----
+  const sortedByInd = [...personScores].sort((a, b) => b.individual - a.individual);
+  const selfItems: FeedbackItem[] = [];
+
+  // 上位2筋肉
+  sortedByInd.slice(0, 2).forEach(s => {
+    if (s.individual - ownAvgInd >= 0.15) {
+      selfItems.push({
+        type: 'strength',
+        message: `「${s.muscleName}」はあなたの10筋肉の中で最も発揮されている強みです（${s.individual.toFixed(2)}）。この力を活かして周囲との対話でリードしていきましょう。`,
+      });
+    }
+  });
+
+  // 下位2筋肉
+  sortedByInd.slice(-2).reverse().forEach(s => {
+    if (ownAvgInd - s.individual >= 0.15) {
+      selfItems.push({
+        type: 'growth',
+        message: `「${s.muscleName}」はあなたの筋肉の中で相対的に伸びしろのある領域です（${s.individual.toFixed(2)}）。意識的に取り組むことで全体的なバランスが高まります。`,
+      });
+    }
+  });
+
+  // 個人×組織ギャップ（同一筋肉内）
+  const gapItems: FeedbackItem[] = [];
+  [...personScores]
+    .sort((a, b) => Math.abs(b.individual - b.organization) - Math.abs(a.individual - a.organization))
+    .slice(0, 3)
+    .forEach(s => {
+      const gap = s.individual - s.organization;
+      if (gap >= 0.8) {
+        gapItems.push({
+          type: 'org_gap',
+          message: `「${s.muscleName}」は個人スコア（${s.individual.toFixed(2)}）に比べて組織スコア（${s.organization.toFixed(2)}）が低い状態です。あなたの力が発揮しやすい環境づくりを周囲と働きかけてみましょう。`,
+        });
+      } else if (gap <= -0.8) {
+        gapItems.push({
+          type: 'ind_gap',
+          message: `「${s.muscleName}」は組織スコア（${s.organization.toFixed(2)}）に比べて個人スコア（${s.individual.toFixed(2)}）が低い状態です。環境は整っているので、個人的な実践を増やすことで大きく伸びる可能性があります。`,
+        });
+      }
+    });
+
+  // ---- 全体平均との比較 ----
+  const avgItems: FeedbackItem[] = [];
+  if (avgScores) {
+    const avgMap = new Map(avgScores.map(s => [s.muscleIndex, s]));
+    const diffs = personScores
+      .map(s => ({ ...s, diffInd: s.individual - (avgMap.get(s.muscleIndex)?.individual ?? s.individual) }))
+      .sort((a, b) => b.diffInd - a.diffInd);
+
+    // 上位（平均より高い）
+    diffs
+      .filter(s => s.diffInd >= 0.3)
+      .slice(0, 2)
+      .forEach(s => {
+        avgItems.push({
+          type: 'above_avg',
+          message: `「${s.muscleName}」は全体平均より+${s.diffInd.toFixed(2)}高く、チームの中でも際立った強みです。他のメンバーへの良い影響が期待できます。`,
+        });
+      });
+
+    // 下位（平均より低い）
+    diffs
+      .filter(s => s.diffInd <= -0.3)
+      .slice(-2)
+      .reverse()
+      .forEach(s => {
+        avgItems.push({
+          type: 'below_avg',
+          message: `「${s.muscleName}」は全体平均より${s.diffInd.toFixed(2)}低い状態です。チーム全体と合わせて重点的に強化を検討する価値があります。`,
+        });
+      });
+  }
+
+  const groups: FeedbackGroup[] = [];
+  if (selfItems.length > 0) {
+    groups.push({ title: '他の筋肉との比較', items: selfItems });
+  }
+  if (avgItems.length > 0) {
+    groups.push({ title: '全体平均との比較', items: avgItems });
+  }
+  if (gapItems.length > 0) {
+    groups.push({ title: '個人と組織のギャップ', items: gapItems });
+  }
+  return groups;
+}
+
+function FeedbackSection({ scores, avgScores }: { scores: MuscleScore[]; avgScores?: MuscleScore[] }) {
+  const groups = generateFeedback(scores, avgScores);
+  if (groups.length === 0) return null;
+
+  return (
+    <div className="mt-6">
+      <h3 className="text-sm font-semibold text-slate-700 mb-3">フィードバック</h3>
+      <div className="space-y-5">
+        {groups.map(group => (
+          <div key={group.title}>
+            <p className="text-xs font-medium text-slate-400 uppercase tracking-wider mb-2">{group.title}</p>
+            <div className="space-y-2">
+              {group.items.map((item, i) => {
+                const style = FEEDBACK_STYLES[item.type];
+                return (
+                  <div key={i} className={`flex gap-3 p-3 rounded-lg border ${style.border} ${style.bg}`}>
+                    <span className={`flex-shrink-0 text-xs font-semibold px-2 py-0.5 rounded-full h-fit mt-0.5 ${style.labelColor}`}>
+                      {style.label}
+                    </span>
+                    <p className={`text-sm leading-relaxed ${style.text}`}>{item.message}</p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ===== /フィードバック生成 =====
+
+// ===== 全体傾向サマリー =====
+
+interface SummaryParagraph {
+  heading: string;
+  body: string;
+}
+
+function generateGroupSummary(
+  scores: MuscleScore[],
+  responseCount: number,
+  surveyTypeLabel: string
+): SummaryParagraph[] {
+  const paragraphs: SummaryParagraph[] = [];
+
+  const avgInd = scores.reduce((s, sc) => s + sc.individual, 0) / scores.length;
+  const avgOrg = scores.reduce((s, sc) => s + sc.organization, 0) / scores.length;
+  const overallGap = avgInd - avgOrg;
+
+  // 総合評価
+  let levelText = '';
+  if (avgInd >= 3.8 && avgOrg >= 3.8) {
+    levelText = '個人・組織ともに非常に高い対話力を発揮しています。';
+  } else if (avgInd >= 3.5 && avgOrg >= 3.5) {
+    levelText = '個人・組織ともに良好な対話力が発揮されています。';
+  } else if (avgInd >= 3.0 && avgOrg >= 3.0) {
+    levelText = '全体的に標準的な水準を保ちつつも、さらなる成長の余地があります。';
+  } else if (avgInd < 3.0 && avgOrg < 3.0) {
+    levelText = '個人・組織ともに対話力の強化が重要な課題となっています。';
+  } else if (avgInd >= 3.0 && avgOrg < 3.0) {
+    levelText = '個人の対話意識は高いものの、それを活かせる組織環境の整備が課題です。';
+  } else {
+    levelText = '組織環境は比較的整っているものの、個人レベルの対話実践の定着が課題です。';
+  }
+
+  paragraphs.push({
+    heading: '総合評価',
+    body: `${surveyTypeLabel}の${responseCount}名の回答を集計した結果、個人スコア平均 ${avgInd.toFixed(2)}、組織スコア平均 ${avgOrg.toFixed(2)} となりました。${levelText}`,
+  });
+
+  // 強みの筋肉（上位3）
+  const sortedByInd = [...scores].sort((a, b) => b.individual - a.individual);
+  const top3 = sortedByInd.slice(0, 3);
+  paragraphs.push({
+    heading: '強みの筋肉',
+    body: `特に高いスコアを示した筋肉は「${top3[0].muscleName}」（${top3[0].individual.toFixed(2)}）、「${top3[1].muscleName}」（${top3[1].individual.toFixed(2)}）、「${top3[2].muscleName}」（${top3[2].individual.toFixed(2)}）です。これらはこの集団の対話力の中核的な強みであり、既に日常的な対話の場で発揮されている可能性が高い領域です。`,
+  });
+
+  // 成長領域（下位3）
+  const bottom3 = sortedByInd.slice(-3).reverse();
+  paragraphs.push({
+    heading: '優先強化領域',
+    body: `相対的にスコアが低い筋肉は「${bottom3[0].muscleName}」（${bottom3[0].individual.toFixed(2)}）、「${bottom3[1].muscleName}」（${bottom3[1].individual.toFixed(2)}）、「${bottom3[2].muscleName}」（${bottom3[2].individual.toFixed(2)}）です。これらは集団として優先的に取り組むことで全体の対話力向上に大きく貢献できる領域です。`,
+  });
+
+  // 4象限パターン分析
+  const qCounts = {
+    both_high: scores.filter(s => getQuadrant(s.individual, s.organization) === 'both_high').length,
+    org_low: scores.filter(s => getQuadrant(s.individual, s.organization) === 'org_low').length,
+    individual_low: scores.filter(s => getQuadrant(s.individual, s.organization) === 'individual_low').length,
+    both_low: scores.filter(s => getQuadrant(s.individual, s.organization) === 'both_low').length,
+  };
+  const dominant = (Object.entries(qCounts) as [string, number][]).sort((a, b) => b[1] - a[1])[0];
+
+  let patternBody = '';
+  if (dominant[0] === 'both_high') {
+    patternBody = `10筋肉のうち${dominant[1]}個が「発揮できている」（個人・組織ともに高い）象限に位置しており、強みの発揮と組織文化の両立が実現できています。この強みを維持しながら、残りの領域への波及を図ることが次のステップです。`;
+  } else if (dominant[0] === 'org_low') {
+    patternBody = `${dominant[1]}個の筋肉が「環境が阻害中」（個人は高いが組織が低い）象限に位置しています。メンバーの意識・能力はあるものの、それを活かせる場や文化が不足している状態です。心理的安全性の向上や対話の仕組みづくりが効果的なアプローチになるでしょう。`;
+  } else if (dominant[0] === 'individual_low') {
+    patternBody = `${dominant[1]}個の筋肉が「個人が課題」（組織は高いが個人が低い）象限に位置しています。環境や文化は比較的整っているものの、個人レベルでの実践や行動変容が追いついていない状態です。個別コーチングや実践の場の提供が効果的です。`;
+  } else {
+    patternBody = `${dominant[1]}個の筋肉が「両方に課題」（個人・組織ともに低い）象限に位置しており、個人・組織の両面での包括的な対話力強化が最優先課題といえます。まずは安心して意見を言える場づくりから始めることを推奨します。`;
+  }
+  paragraphs.push({ heading: '象限パターンの傾向', body: patternBody });
+
+  // 個人と組織のギャップ傾向
+  if (Math.abs(overallGap) >= 0.25) {
+    const gapBody = overallGap > 0
+      ? `全体として個人スコアが組織スコアを平均 ${overallGap.toFixed(2)} 上回っています。「意識・意欲はあるが、組織の場や環境が対話を後押ししていない」という構造的な課題が示唆されます。制度・文化・会議体の見直しが効果的です。`
+      : `全体として組織スコアが個人スコアを平均 ${Math.abs(overallGap).toFixed(2)} 上回っています。「環境や文化は整っているが、個人の実践が追いついていない」状態です。スキルトレーニングや実践機会の提供が効果的なアプローチになるでしょう。`;
+    paragraphs.push({ heading: '個人と組織の乖離', body: gapBody });
+  }
+
+  return paragraphs;
+}
+
+function GroupSummarySection({
+  scores,
+  responseCount,
+  surveyTypeLabel,
+}: {
+  scores: MuscleScore[];
+  responseCount: number;
+  surveyTypeLabel: string;
+}) {
+  const [open, setOpen] = useState(true);
+  const paragraphs = generateGroupSummary(scores, responseCount, surveyTypeLabel);
+
+  return (
+    <div className="bg-white rounded-xl border border-slate-200 shadow-sm mb-6 overflow-hidden">
+      <button
+        onClick={() => setOpen(v => !v)}
+        className="w-full flex items-center justify-between px-6 py-4 hover:bg-slate-50 transition text-left"
+      >
+        <div>
+          <h2 className="text-lg font-semibold text-slate-800">全体傾向サマリー</h2>
+          <p className="text-xs text-slate-400 mt-0.5">集団の特徴と傾向を自動分析</p>
+        </div>
+        <svg
+          className={`w-5 h-5 text-slate-400 transition-transform flex-shrink-0 ${open ? 'rotate-180' : ''}`}
+          fill="none" stroke="currentColor" viewBox="0 0 24 24"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+
+      {open && (
+        <div className="border-t border-slate-100 px-6 py-5 space-y-4">
+          {paragraphs.map((p, i) => (
+            <div key={i} className="flex gap-3">
+              <div className="flex-shrink-0 mt-0.5">
+                <span className="inline-block text-xs font-semibold bg-slate-800 text-white px-2 py-0.5 rounded">
+                  {p.heading}
+                </span>
+              </div>
+              <p className="text-sm text-slate-700 leading-relaxed">{p.body}</p>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ===== /全体傾向サマリー =====
+
 const SURVEY_TYPE_LABELS: Record<SurveyTypeFilter, string> = {
   all: '全体',
   attitude: '意識調査',
@@ -368,6 +652,12 @@ export default function ResultsClient({ token, organizationName }: Props) {
               </div>
             ) : (
               <>
+                <GroupSummarySection
+                  scores={results.scores}
+                  responseCount={results.responseCount}
+                  surveyTypeLabel={SURVEY_TYPE_LABELS[surveyTypeFilter]}
+                />
+
                 <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 mb-6">
                   <h2 className="text-lg font-semibold text-slate-800 mb-1">レーダーチャート</h2>
                   <p className="text-sm text-slate-500 mb-4">10筋肉の個人平均（青）と組織平均（緑）</p>
@@ -565,6 +855,11 @@ export default function ResultsClient({ token, organizationName }: Props) {
                               <ScoreTable scores={person.scores} avgScores={results.responseCount > 1 ? results.scores : undefined} />
                             </div>
                           </div>
+
+                          <FeedbackSection
+                            scores={person.scores}
+                            avgScores={results.responseCount > 1 ? results.scores : undefined}
+                          />
                         </div>
                       )}
                     </div>
