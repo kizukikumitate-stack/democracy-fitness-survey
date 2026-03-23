@@ -36,7 +36,8 @@ export async function POST(
       );
     }
 
-    const { data, error } = await supabase
+    // まず survey_type 列込みで INSERT を試みる
+    let { data, error } = await supabase
       .from('responses')
       .insert({
         survey_token: params.token,
@@ -46,6 +47,21 @@ export async function POST(
       })
       .select()
       .single();
+
+    // survey_type 列が存在しない場合（マイグレーション未実施）はなしで再試行
+    if (error && error.message?.includes('survey_type')) {
+      const retry = await supabase
+        .from('responses')
+        .insert({
+          survey_token: params.token,
+          respondent_name: respondentName?.trim() || '匿名',
+          answers: answers,
+        })
+        .select()
+        .single();
+      data = retry.data;
+      error = retry.error;
+    }
 
     if (error) throw error;
 
