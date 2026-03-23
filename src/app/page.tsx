@@ -20,6 +20,8 @@ export default function AdminPage() {
   const [copiedToken, setCopiedToken] = useState<string | null>(null);
   const [copiedBlindToken, setCopiedBlindToken] = useState<string | null>(null);
   const [copiedBehaviorToken, setCopiedBehaviorToken] = useState<string | null>(null);
+  const [editingToken, setEditingToken] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState('');
 
   const fetchSurveys = useCallback(async () => {
     setFetching(true);
@@ -39,6 +41,19 @@ export default function AdminPage() {
   useEffect(() => {
     fetchSurveys();
   }, [fetchSurveys]);
+
+  const handleRename = async (token: string) => {
+    if (!editingName.trim()) { setEditingToken(null); return; }
+    try {
+      await fetch(`/api/surveys/${token}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ organizationName: editingName.trim() }),
+      });
+      setSurveys(prev => prev.map(s => s.token === token ? { ...s, organizationName: editingName.trim() } : s));
+    } catch { /* silently fail */ }
+    setEditingToken(null);
+  };
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -198,9 +213,33 @@ export default function AdminPage() {
                 <div key={survey.id} className="px-6 py-4 hover:bg-slate-50 transition">
                   {/* Info */}
                   <div className="flex items-center gap-3 mb-3">
-                    <h3 className="font-semibold text-slate-800 truncate">
-                      {survey.organizationName}
-                    </h3>
+                    {editingToken === survey.token ? (
+                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                        <input
+                          autoFocus
+                          type="text"
+                          value={editingName}
+                          onChange={e => setEditingName(e.target.value)}
+                          onKeyDown={e => { if (e.key === 'Enter') handleRename(survey.token); if (e.key === 'Escape') setEditingToken(null); }}
+                          className="flex-1 min-w-0 px-2 py-1 border border-blue-400 rounded-md text-slate-800 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                        <button onClick={() => handleRename(survey.token)} className="text-xs px-2.5 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition whitespace-nowrap">保存</button>
+                        <button onClick={() => setEditingToken(null)} className="text-xs px-2.5 py-1 border border-slate-300 text-slate-500 rounded-md hover:bg-slate-100 transition">キャンセル</button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <h3 className="font-semibold text-slate-800 truncate">{survey.organizationName}</h3>
+                        <button
+                          onClick={() => { setEditingToken(survey.token); setEditingName(survey.organizationName); }}
+                          className="flex-shrink-0 text-slate-400 hover:text-slate-600 transition"
+                          title="タイトルを編集"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536M9 11l6.536-6.536a2 2 0 112.828 2.828L11.828 13.828A2 2 0 0110 14H8v-2a2 2 0 01.586-1.414z" />
+                          </svg>
+                        </button>
+                      </div>
+                    )}
                     <span className="flex-shrink-0 inline-flex items-center gap-1 bg-slate-100 text-slate-600 text-xs px-2 py-0.5 rounded-full">
                       <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
