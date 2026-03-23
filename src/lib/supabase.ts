@@ -22,5 +22,6 @@ export type Response = {
   survey_token: string
   respondent_name: string | null
   answers: Record<string, number>
+  survey_type: string | null  // 'attitude' | 'behavior'
   created_at: string
 }

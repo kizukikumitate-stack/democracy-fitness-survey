@@ -3,7 +3,7 @@ import { supabase } from '@/lib/supabase';
 import { QUESTIONS, MUSCLES, transformScore } from '@/lib/questions';
 
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: { token: string } }
 ) {
   try {
@@ -17,10 +17,19 @@ export async function GET(
       return NextResponse.json({ error: 'Survey not found' }, { status: 404 });
     }
 
-    const { data: responses, error: responsesError } = await supabase
+    const type = req.nextUrl.searchParams.get('type');
+    let query = supabase
       .from('responses')
       .select('*')
       .eq('survey_token', params.token);
+
+    if (type === 'behavior') {
+      query = query.eq('survey_type', 'behavior');
+    } else if (type === 'attitude') {
+      query = query.or('survey_type.eq.attitude,survey_type.is.null');
+    }
+
+    const { data: responses, error: responsesError } = await query;
 
     if (responsesError) throw responsesError;
 

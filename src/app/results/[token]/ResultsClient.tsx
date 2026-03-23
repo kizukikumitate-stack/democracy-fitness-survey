@@ -24,6 +24,7 @@ interface RawResponse {
   survey_token: string;
   respondent_name: string | null;
   answers: Record<string, number>;
+  survey_type: string | null;
   created_at: string;
 }
 
@@ -31,6 +32,7 @@ interface IndividualResult {
   id: string;
   name: string;
   createdAt: string;
+  surveyType: string;
   scores: MuscleScore[];
 }
 
@@ -38,6 +40,8 @@ interface Props {
   token: string;
   organizationName: string;
 }
+
+type SurveyTypeFilter = 'all' | 'attitude' | 'behavior';
 
 const QUADRANT_COLORS = {
   both_high: { bg: 'bg-green-50', border: 'border-green-200', text: 'text-green-800', badge: 'bg-green-100 text-green-700' },
@@ -79,15 +83,30 @@ function computeScores(answers: Record<string, number>): MuscleScore[] {
   });
 }
 
-function ScoreTable({ scores }: { scores: MuscleScore[] }) {
+function DiffBadge({ diff }: { diff: number }) {
+  const sign = diff >= 0 ? '+' : '';
+  const color = diff >= 0.1 ? 'text-green-600' : diff <= -0.1 ? 'text-red-500' : 'text-slate-400';
+  return (
+    <span className={`text-xs font-medium ${color}`}>
+      {sign}{diff.toFixed(2)}
+    </span>
+  );
+}
+
+function ScoreTable({ scores, avgScores }: { scores: MuscleScore[]; avgScores?: MuscleScore[] }) {
+  const avgMap = avgScores ? new Map(avgScores.map(s => [s.muscleIndex, s])) : null;
   return (
     <div className="overflow-x-auto">
       <table className="w-full">
         <thead>
           <tr className="bg-slate-50">
             <th className="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">筋肉</th>
-            <th className="text-center px-4 py-3 text-xs font-medium text-blue-600 uppercase tracking-wider">個人</th>
-            <th className="text-center px-4 py-3 text-xs font-medium text-green-600 uppercase tracking-wider">組織</th>
+            <th className="text-center px-4 py-3 text-xs font-medium text-blue-600 uppercase tracking-wider">
+              {avgMap ? '個人（本人 / 平均）' : '個人'}
+            </th>
+            <th className="text-center px-4 py-3 text-xs font-medium text-green-600 uppercase tracking-wider">
+              {avgMap ? '組織（本人 / 平均）' : '組織'}
+            </th>
             <th className="text-center px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">診断</th>
           </tr>
         </thead>
@@ -95,6 +114,7 @@ function ScoreTable({ scores }: { scores: MuscleScore[] }) {
           {scores.map(score => {
             const quadrant = getQuadrant(score.individual, score.organization);
             const qColors = QUADRANT_COLORS[quadrant];
+            const avg = avgMap?.get(score.muscleIndex);
             return (
               <tr key={score.muscleIndex} className="hover:bg-slate-50 transition">
                 <td className="px-4 py-2.5">
@@ -108,6 +128,12 @@ function ScoreTable({ scores }: { scores: MuscleScore[] }) {
                     </div>
                     <span className="text-sm font-semibold text-blue-600 w-8 text-right">{score.individual.toFixed(2)}</span>
                   </div>
+                  {avg && (
+                    <div className="flex items-center justify-center gap-1 mt-0.5">
+                      <span className="text-xs text-slate-400">平均 {avg.individual.toFixed(2)}</span>
+                      <DiffBadge diff={score.individual - avg.individual} />
+                    </div>
+                  )}
                 </td>
                 <td className="px-4 py-2.5 text-center">
                   <div className="flex items-center justify-center gap-2">
@@ -116,6 +142,12 @@ function ScoreTable({ scores }: { scores: MuscleScore[] }) {
                     </div>
                     <span className="text-sm font-semibold text-green-600 w-8 text-right">{score.organization.toFixed(2)}</span>
                   </div>
+                  {avg && (
+                    <div className="flex items-center justify-center gap-1 mt-0.5">
+                      <span className="text-xs text-slate-400">平均 {avg.organization.toFixed(2)}</span>
+                      <DiffBadge diff={score.organization - avg.organization} />
+                    </div>
+                  )}
                 </td>
                 <td className="px-4 py-2.5 text-center">
                   <span className={`inline-block text-xs font-medium px-2 py-1 rounded-full ${qColors.badge}`}>
@@ -131,6 +163,12 @@ function ScoreTable({ scores }: { scores: MuscleScore[] }) {
   );
 }
 
+const SURVEY_TYPE_LABELS: Record<SurveyTypeFilter, string> = {
+  all: '全体',
+  attitude: '意識調査',
+  behavior: '行動実績',
+};
+
 export default function ResultsClient({ token, organizationName }: Props) {
   const [results, setResults] = useState<ResultsData | null>(null);
   const [individuals, setIndividuals] = useState<IndividualResult[]>([]);
@@ -139,13 +177,17 @@ export default function ResultsClient({ token, organizationName }: Props) {
   const [tab, setTab] = useState<'org' | 'individual'>('org');
   const [openId, setOpenId] = useState<string | null>(null);
   const [blurNames, setBlurNames] = useState(false);
+  const [surveyTypeFilter, setSurveyTypeFilter] = useState<SurveyTypeFilter>('all');
 
   useEffect(() => {
+    setLoading(true);
+    setOpenId(null);
     const fetchAll = async () => {
       try {
+        const typeParam = surveyTypeFilter !== 'all' ? `?type=${surveyTypeFilter}` : '';
         const [resOrg, resRaw] = await Promise.all([
-          fetch(`/api/results/${token}`),
-          fetch(`/api/responses/${token}`),
+          fetch(`/api/results/${token}${typeParam}`),
+          fetch(`/api/responses/${token}${typeParam}`),
         ]);
         if (resOrg.ok) {
           setResults(await resOrg.json());
@@ -159,6 +201,7 @@ export default function ResultsClient({ token, organizationName }: Props) {
               id: r.id,
               name: r.respondent_name || '匿名',
               createdAt: r.created_at,
+              surveyType: r.survey_type || 'attitude',
               scores: computeScores(r.answers),
             }))
           );
@@ -170,7 +213,7 @@ export default function ResultsClient({ token, organizationName }: Props) {
       }
     };
     fetchAll();
-  }, [token]);
+  }, [token, surveyTypeFilter]);
 
   const formatDate = (dateStr: string) =>
     new Date(dateStr).toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' });
@@ -214,6 +257,13 @@ export default function ResultsClient({ token, organizationName }: Props) {
   const avgIndividual = results.scores.reduce((sum, s) => sum + s.individual, 0) / results.scores.length;
   const avgOrganization = results.scores.reduce((sum, s) => sum + s.organization, 0) / results.scores.length;
 
+  // Average radar data used for individual comparison overlay
+  const avgRadar = results.scores.map(s => ({
+    muscle: MUSCLES[s.muscleIndex].name,
+    individual: Math.round(s.individual * 100) / 100,
+    organization: Math.round(s.organization * 100) / 100,
+  }));
+
   return (
     <div className="min-h-screen bg-slate-50">
       <header className="bg-white border-b border-slate-200 shadow-sm">
@@ -228,6 +278,39 @@ export default function ResultsClient({ token, organizationName }: Props) {
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-slate-800 mb-1">{organizationName}</h1>
           <p className="text-slate-500 text-sm">デモクラシーフィットネス診断 結果レポート</p>
+        </div>
+
+        {/* Survey type filter */}
+        <div className="flex items-center gap-2 mb-6">
+          <span className="text-sm text-slate-500 font-medium">診断種別：</span>
+          <div className="flex gap-1 bg-slate-100 rounded-lg p-1">
+            {(['all', 'attitude', 'behavior'] as const).map(type => (
+              <button
+                key={type}
+                onClick={() => setSurveyTypeFilter(type)}
+                className={`px-4 py-1.5 rounded-md text-sm font-medium transition ${
+                  surveyTypeFilter === type
+                    ? type === 'behavior'
+                      ? 'bg-orange-500 text-white shadow-sm'
+                      : type === 'attitude'
+                      ? 'bg-blue-600 text-white shadow-sm'
+                      : 'bg-white text-slate-800 shadow-sm'
+                    : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                {SURVEY_TYPE_LABELS[type]}
+              </button>
+            ))}
+          </div>
+          {surveyTypeFilter !== 'all' && (
+            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+              surveyTypeFilter === 'behavior'
+                ? 'bg-orange-100 text-orange-700'
+                : 'bg-blue-100 text-blue-700'
+            }`}>
+              {SURVEY_TYPE_LABELS[surveyTypeFilter]}のみ表示中
+            </span>
+          )}
         </div>
 
         {/* Summary cards */}
@@ -278,7 +361,9 @@ export default function ResultsClient({ token, organizationName }: Props) {
           <>
             {results.responseCount === 0 ? (
               <div className="bg-white rounded-xl border border-slate-200 p-12 text-center">
-                <p className="text-slate-500">まだ回答がありません。</p>
+                <p className="text-slate-500">
+                  {surveyTypeFilter === 'all' ? 'まだ回答がありません。' : `${SURVEY_TYPE_LABELS[surveyTypeFilter]}の回答がありません。`}
+                </p>
                 <p className="text-slate-400 text-sm mt-2">サーベイリンクを共有して回答を集めてください。</p>
               </div>
             ) : (
@@ -353,10 +438,24 @@ export default function ResultsClient({ token, organizationName }: Props) {
           <>
             {individuals.length === 0 ? (
               <div className="bg-white rounded-xl border border-slate-200 p-12 text-center">
-                <p className="text-slate-500">まだ回答がありません。</p>
+                <p className="text-slate-500">
+                  {surveyTypeFilter === 'all' ? 'まだ回答がありません。' : `${SURVEY_TYPE_LABELS[surveyTypeFilter]}の回答がありません。`}
+                </p>
               </div>
             ) : (
               <>
+                {results.responseCount > 0 && (
+                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 mb-4 flex items-start gap-3">
+                    <svg className="w-4 h-4 text-slate-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <p className="text-xs text-slate-500">
+                      各個人を開くと、スコアが
+                      <span className="font-medium text-slate-700">全体平均（オレンジ点線）</span>
+                      と比較して表示されます。スコア表の差分（+/-）は全体平均との差です。
+                    </p>
+                  </div>
+                )}
               <div className="flex justify-end mb-3">
                 <button
                   onClick={() => setBlurNames(v => !v)}
@@ -387,9 +486,12 @@ export default function ResultsClient({ token, organizationName }: Props) {
                     organization: Math.round(s.organization * 100) / 100,
                   }));
 
+                  const indDiffFromAvg = avgInd - avgIndividual;
+                  const orgDiffFromAvg = avgOrg - avgOrganization;
+
                   return (
                     <div key={person.id} className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-                      {/* Header row — click to toggle */}
+                      {/* Header row */}
                       <button
                         onClick={() => setOpenId(isOpen ? null : person.id)}
                         className="w-full flex items-center justify-between px-6 py-4 hover:bg-slate-50 transition text-left"
@@ -400,7 +502,16 @@ export default function ResultsClient({ token, organizationName }: Props) {
                           </div>
                           <div>
                             <div className={`font-semibold text-slate-800 transition-all ${blurNames && !isOpen ? 'blur-sm select-none' : ''}`}>{person.name}</div>
-                            <div className="text-xs text-slate-400">{formatDate(person.createdAt)}</div>
+                            <div className="flex items-center gap-2 mt-0.5">
+                              <span className="text-xs text-slate-400">{formatDate(person.createdAt)}</span>
+                              <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${
+                                person.surveyType === 'behavior'
+                                  ? 'bg-orange-100 text-orange-600'
+                                  : 'bg-blue-100 text-blue-600'
+                              }`}>
+                                {person.surveyType === 'behavior' ? '行動実績' : '意識調査'}
+                              </span>
+                            </div>
                           </div>
                         </div>
                         <div className="flex items-center gap-6">
@@ -420,26 +531,38 @@ export default function ResultsClient({ token, organizationName }: Props) {
                       {/* Expanded detail */}
                       {isOpen && (
                         <div className="border-t border-slate-100 px-6 py-6">
-                          <div className="grid grid-cols-2 gap-4 mb-6">
-                            <div className="bg-blue-50 rounded-lg p-4 text-center">
+                          {/* Score summary: self vs avg */}
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+                            <div className="bg-blue-50 rounded-lg p-3 text-center">
                               <div className="text-2xl font-bold text-blue-600">{avgInd.toFixed(2)}</div>
-                              <div className="text-xs text-slate-500 mt-1">個人スコア平均</div>
+                              <div className="text-xs text-slate-500 mt-0.5">個人スコア（本人）</div>
                             </div>
-                            <div className="bg-green-50 rounded-lg p-4 text-center">
+                            <div className="bg-slate-50 rounded-lg p-3 text-center">
+                              <div className="text-2xl font-bold text-slate-500">{avgIndividual.toFixed(2)}</div>
+                              <div className="text-xs text-slate-500 mt-0.5">個人スコア（全体平均）</div>
+                              <div className="mt-1"><DiffBadge diff={indDiffFromAvg} /></div>
+                            </div>
+                            <div className="bg-green-50 rounded-lg p-3 text-center">
                               <div className="text-2xl font-bold text-green-600">{avgOrg.toFixed(2)}</div>
-                              <div className="text-xs text-slate-500 mt-1">組織スコア平均</div>
+                              <div className="text-xs text-slate-500 mt-0.5">組織スコア（本人）</div>
+                            </div>
+                            <div className="bg-slate-50 rounded-lg p-3 text-center">
+                              <div className="text-2xl font-bold text-slate-500">{avgOrganization.toFixed(2)}</div>
+                              <div className="text-xs text-slate-500 mt-0.5">組織スコア（全体平均）</div>
+                              <div className="mt-1"><DiffBadge diff={orgDiffFromAvg} /></div>
                             </div>
                           </div>
 
                           <div className="mb-6">
-                            <h3 className="text-sm font-semibold text-slate-700 mb-3">レーダーチャート</h3>
-                            <SurveyRadarChart data={personRadar} />
+                            <h3 className="text-sm font-semibold text-slate-700 mb-1">レーダーチャート</h3>
+                            <p className="text-xs text-slate-400 mb-3">実線=本人スコア、点線=全体平均</p>
+                            <SurveyRadarChart data={personRadar} avgData={results.responseCount > 1 ? avgRadar : undefined} />
                           </div>
 
                           <div>
                             <h3 className="text-sm font-semibold text-slate-700 mb-3">筋肉別スコア</h3>
                             <div className="rounded-lg border border-slate-100 overflow-hidden">
-                              <ScoreTable scores={person.scores} />
+                              <ScoreTable scores={person.scores} avgScores={results.responseCount > 1 ? results.scores : undefined} />
                             </div>
                           </div>
                         </div>

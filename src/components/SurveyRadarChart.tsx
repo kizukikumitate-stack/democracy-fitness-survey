@@ -19,12 +19,20 @@ interface RadarDataPoint {
 
 interface SurveyRadarChartProps {
   data: RadarDataPoint[];
+  avgData?: RadarDataPoint[];
 }
 
-export default function SurveyRadarChart({ data }: SurveyRadarChartProps) {
+export default function SurveyRadarChart({ data, avgData }: SurveyRadarChartProps) {
+  const chartData = data.map((d, i) => ({
+    ...d,
+    ...(avgData?.[i]
+      ? { avgIndividual: avgData[i].individual, avgOrganization: avgData[i].organization }
+      : {}),
+  }));
+
   return (
     <ResponsiveContainer width="100%" height={420}>
-      <RadarChart data={data} margin={{ top: 20, right: 30, bottom: 20, left: 30 }}>
+      <RadarChart data={chartData} margin={{ top: 20, right: 30, bottom: 20, left: 30 }}>
         <PolarGrid stroke="#e5e7eb" />
         <PolarAngleAxis
           dataKey="muscle"
@@ -52,6 +60,28 @@ export default function SurveyRadarChart({ data }: SurveyRadarChartProps) {
           fillOpacity={0.2}
           strokeWidth={2}
         />
+        {avgData && (
+          <Radar
+            name="全体平均（個人）"
+            dataKey="avgIndividual"
+            stroke="#F97316"
+            fill="#F97316"
+            fillOpacity={0.05}
+            strokeWidth={2}
+            strokeDasharray="5 3"
+          />
+        )}
+        {avgData && (
+          <Radar
+            name="全体平均（組織）"
+            dataKey="avgOrganization"
+            stroke="#6B7280"
+            fill="#6B7280"
+            fillOpacity={0.05}
+            strokeWidth={2}
+            strokeDasharray="5 3"
+          />
+        )}
         <Legend
           wrapperStyle={{ fontSize: '14px', fontFamily: 'system-ui, sans-serif' }}
         />

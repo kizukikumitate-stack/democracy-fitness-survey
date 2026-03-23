@@ -18,7 +18,7 @@ export async function POST(
     }
 
     const body = await req.json();
-    const { respondentName, answers } = body;
+    const { respondentName, answers, surveyType } = body;
 
     if (!answers || typeof answers !== 'object') {
       return NextResponse.json({ error: 'answers は必須です' }, { status: 400 });
@@ -42,6 +42,7 @@ export async function POST(
         survey_token: params.token,
         respondent_name: respondentName?.trim() || '匿名',
         answers: answers,
+        survey_type: surveyType === 'behavior' ? 'behavior' : 'attitude',
       })
       .select()
       .single();
@@ -56,7 +57,7 @@ export async function POST(
 }
 
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: { token: string } }
 ) {
   try {
@@ -70,11 +71,20 @@ export async function GET(
       return NextResponse.json({ error: 'Survey not found' }, { status: 404 });
     }
 
-    const { data: responses, error } = await supabase
+    const type = req.nextUrl.searchParams.get('type');
+    let query = supabase
       .from('responses')
       .select('*')
       .eq('survey_token', params.token)
       .order('created_at', { ascending: true });
+
+    if (type === 'behavior') {
+      query = query.eq('survey_type', 'behavior');
+    } else if (type === 'attitude') {
+      query = query.or('survey_type.eq.attitude,survey_type.is.null');
+    }
+
+    const { data: responses, error } = await query;
 
     if (error) throw error;
 

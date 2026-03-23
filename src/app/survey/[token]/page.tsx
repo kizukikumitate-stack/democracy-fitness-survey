@@ -167,6 +167,7 @@ export default function SurveyPage() {
           respondentName: respondentName.trim() || '匿名',
           respondentDate: respondentDate || '',
           answers,
+          surveyType: behavior ? 'behavior' : 'attitude',
         }),
       });
       if (res.ok) {
