@@ -395,11 +395,11 @@ export default function ResultsClient({ token, organizationName }: Props) {
                         className="w-full flex items-center justify-between px-6 py-4 hover:bg-slate-50 transition text-left"
                       >
                         <div className="flex items-center gap-4">
-                          <div className={`w-9 h-9 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold text-sm flex-shrink-0 transition-all ${blurNames ? 'blur-sm select-none' : ''}`}>
+                          <div className={`w-9 h-9 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold text-sm flex-shrink-0 transition-all ${blurNames && !isOpen ? 'blur-sm select-none' : ''}`}>
                             {person.name.charAt(0)}
                           </div>
                           <div>
-                            <div className={`font-semibold text-slate-800 transition-all ${blurNames ? 'blur-sm select-none' : ''}`}>{person.name}</div>
+                            <div className={`font-semibold text-slate-800 transition-all ${blurNames && !isOpen ? 'blur-sm select-none' : ''}`}>{person.name}</div>
                             <div className="text-xs text-slate-400">{formatDate(person.createdAt)}</div>
                           </div>
                         </div>
