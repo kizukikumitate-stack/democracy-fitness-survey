@@ -173,32 +173,65 @@ export async function generateResultPdfBuffer(params: {
   page.drawLine({ start: { x: 24, y: fbStartY + 14 }, end: { x: 571, y: fbStartY + 14 }, thickness: 0.5, color: rgb(0.88, 0.91, 0.94) });
   page.drawText('フィードバック', { x: 24, y: fbStartY, size: 10, font: jpFont, color: C.slate700 });
 
+  // --- 結果ページと同じロジック ---
+  const ownAvgInd = scores.reduce((s, sc) => s + sc.individual, 0) / scores.length;
   const sortedByInd = [...scores].sort((a, b) => b.individual - a.individual);
-  const feedbackLines: { badge: string; text: string; badgeColor: typeof C.blue600 }[] = [];
 
-  // 強み・成長ポイント
+  interface FbLine { group: string; badge: string; text: string; badgeColor: typeof C.blue600 }
+  const feedbackLines: FbLine[] = [];
+
+  // 1. 他の筋肉との比較（強み・成長）
   sortedByInd.slice(0, 2).forEach(s => {
-    feedbackLines.push({ badge: '強み', text: `「${s.muscleName}」はあなたの10筋肉で特に発揮されている強みです（${s.individual.toFixed(2)}）`, badgeColor: C.blue600 });
+    if (s.individual - ownAvgInd >= 0.15) {
+      feedbackLines.push({ group: '他の筋肉との比較', badge: '強み', text: `「${s.muscleName}」はあなたの10筋肉の中で最も発揮されている強みです（${s.individual.toFixed(2)}）。この力を活かして周囲との対話でリードしていきましょう。`, badgeColor: C.blue600 });
+    }
   });
   sortedByInd.slice(-2).reverse().forEach(s => {
-    feedbackLines.push({ badge: '成長', text: `「${s.muscleName}」は相対的に伸びしろのある領域です（${s.individual.toFixed(2)}）`, badgeColor: rgb(0.78, 0.62, 0.04) });
+    if (ownAvgInd - s.individual >= 0.15) {
+      feedbackLines.push({ group: '他の筋肉との比較', badge: '成長ポイント', text: `「${s.muscleName}」はあなたの筋肉の中で相対的に伸びしろのある領域です（${s.individual.toFixed(2)}）。意識的に取り組むことで全体的なバランスが高まります。`, badgeColor: rgb(0.78, 0.62, 0.04) });
+    }
   });
 
-  // 全体平均比
+  // 2. 全体平均との比較
   if (avgScores) {
-    const diffs = scores.map(s => ({ ...s, diff: s.individual - (avgScores.find(a => a.muscleIndex === s.muscleIndex)?.individual ?? s.individual) }));
-    diffs.filter(s => s.diff >= 0.3).slice(0, 2).forEach(s => {
-      feedbackLines.push({ badge: '平均以上', text: `「${s.muscleName}」は全体平均より${diffStr(s.diff)}高く、チームの中でも際立った強みです`, badgeColor: C.green600 });
+    const avgMap = new Map(avgScores.map(s => [s.muscleIndex, s]));
+    const diffs = scores
+      .map(s => ({ ...s, diffInd: s.individual - (avgMap.get(s.muscleIndex)?.individual ?? s.individual) }))
+      .sort((a, b) => b.diffInd - a.diffInd);
+    diffs.filter(s => s.diffInd >= 0.3).slice(0, 2).forEach(s => {
+      feedbackLines.push({ group: '全体平均との比較', badge: '平均以上', text: `「${s.muscleName}」は全体平均より+${s.diffInd.toFixed(2)}高く、チームの中でも際立った強みです。他のメンバーへの良い影響が期待できます。`, badgeColor: C.green600 });
     });
-    diffs.filter(s => s.diff <= -0.3).slice(-2).reverse().forEach(s => {
-      feedbackLines.push({ badge: '要強化', text: `「${s.muscleName}」は全体平均より${diffStr(s.diff)}低い状態です。チームと合わせて強化を検討してみましょう`, badgeColor: C.minus });
+    diffs.filter(s => s.diffInd <= -0.3).slice(-2).reverse().forEach(s => {
+      feedbackLines.push({ group: '全体平均との比較', badge: '要強化', text: `「${s.muscleName}」は全体平均より${s.diffInd.toFixed(2)}低い状態です。チーム全体と合わせて重点的に強化を検討する価値があります。`, badgeColor: C.minus });
     });
   }
 
-  feedbackLines.forEach((line, i) => {
-    const lineY = fbStartY - 16 - i * 16;
-    page.drawText(`[${line.badge}]`, { x: 24, y: lineY, size: 7.5, font: jpFont, color: line.badgeColor });
-    page.drawText(line.text, { x: 80, y: lineY, size: 7.5, font: jpFont, color: C.slate700 });
+  // 3. 個人と組織のギャップ（同一筋肉内）
+  [...scores]
+    .sort((a, b) => Math.abs(b.individual - b.organization) - Math.abs(a.individual - a.organization))
+    .slice(0, 3)
+    .forEach(s => {
+      const gap = s.individual - s.organization;
+      if (gap >= 0.8) {
+        feedbackLines.push({ group: '個人と組織のギャップ', badge: '環境ギャップ', text: `「${s.muscleName}」は個人（${s.individual.toFixed(2)}）に比べ組織（${s.organization.toFixed(2)}）が低い状態です。力が発揮しやすい環境づくりを周囲に働きかけてみましょう。`, badgeColor: rgb(0.549, 0.114, 0.753) });
+      } else if (gap <= -0.8) {
+        feedbackLines.push({ group: '個人と組織のギャップ', badge: '実践ギャップ', text: `「${s.muscleName}」は組織（${s.organization.toFixed(2)}）に比べ個人（${s.individual.toFixed(2)}）が低い状態です。環境は整っているので、個人的な実践を増やすことで大きく伸びる可能性があります。`, badgeColor: rgb(0.047, 0.592, 0.694) });
+      }
+    });
+
+  let currentGroup = '';
+  let lineOffset = 0;
+  feedbackLines.forEach((line) => {
+    if (line.group !== currentGroup) {
+      currentGroup = line.group;
+      lineOffset += (lineOffset === 0 ? 0 : 6);
+      page.drawText(line.group, { x: 24, y: fbStartY - 16 - lineOffset, size: 7, font: jpFont, color: C.slate500 });
+      lineOffset += 13;
+    }
+    const lineY = fbStartY - 16 - lineOffset;
+    page.drawText(`[${line.badge}]`, { x: 28, y: lineY, size: 7, font: jpFont, color: line.badgeColor });
+    page.drawText(line.text, { x: 90, y: lineY, size: 7, font: jpFont, color: C.slate700 });
+    lineOffset += 13;
   });
 
   // ===== 凡例・フッター =====
