@@ -1,16 +1,7 @@
-import React from 'react';
-import {
-  Document,
-  Page,
-  Text,
-  View,
-  StyleSheet,
-  Font,
-  renderToBuffer,
-} from '@react-pdf/renderer';
+import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
+import fs from 'fs';
 import path from 'path';
 
-// ===== 型定義 =====
 export interface MuscleScore {
   muscleIndex: number;
   muscleName: string;
@@ -18,276 +9,35 @@ export interface MuscleScore {
   organization: number;
 }
 
-// ===== フォント登録 =====
-let fontRegistered = false;
-function ensureFont() {
-  if (fontRegistered) return;
-  const fontPath = path.join(process.cwd(), 'public', 'fonts', 'NotoSansJP-Regular.ttf');
-  Font.register({ family: 'JP', src: fontPath });
-  Font.register({ family: 'JP', src: fontPath, fontWeight: 'bold' });
-  fontRegistered = true;
+// カラー定義
+const C = {
+  darkBg:   rgb(0.118, 0.157, 0.235), // #1e293b ヘッダー背景
+  white:    rgb(1, 1, 1),
+  light:    rgb(0.97, 0.98, 0.99),    // #f8fafc ページ背景
+  slate500: rgb(0.39, 0.45, 0.55),
+  slate700: rgb(0.20, 0.25, 0.34),
+  blue600:  rgb(0.145, 0.380, 0.925), // 個人スコアバー
+  green600: rgb(0.086, 0.647, 0.259), // 組織スコアバー
+  orange:   rgb(0.96, 0.62, 0.04),    // 全体平均バー
+  barBg:    rgb(0.886, 0.910, 0.941), // バー背景
+  plus:     rgb(0.086, 0.502, 0.235), // +差分
+  minus:    rgb(0.863, 0.196, 0.184), // -差分
+  neutral:  rgb(0.58, 0.64, 0.70),
+};
+
+function clamp01(v: number) { return Math.min(Math.max(v / 5, 0), 1); }
+
+function diffStr(diff: number) {
+  return (diff >= 0 ? '+' : '') + diff.toFixed(2);
 }
 
-// ===== スタイル =====
-const S = StyleSheet.create({
-  page: { fontFamily: 'JP', backgroundColor: '#f8fafc', padding: 0 },
-
-  // ヘッダー
-  header: { backgroundColor: '#1e293b', padding: '20 28', marginBottom: 0 },
-  headerSub: { fontSize: 8, color: '#94a3b8', marginBottom: 3, letterSpacing: 0.5 },
-  headerTitle: { fontSize: 16, fontWeight: 'bold', color: '#ffffff', marginBottom: 2 },
-  headerName: { fontSize: 10, color: '#cbd5e1' },
-
-  body: { padding: '14 28 20' },
-
-  // サマリーカード
-  summaryRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
-  card: { flex: 1, borderRadius: 8, padding: '10 12', border: '1 solid' },
-  cardBlue: { backgroundColor: '#eff6ff', borderColor: '#bfdbfe' },
-  cardGreen: { backgroundColor: '#f0fdf4', borderColor: '#bbf7d0' },
-  cardLabel: { fontSize: 7, fontWeight: 'bold', letterSpacing: 0.5, marginBottom: 4 },
-  cardLabelBlue: { color: '#2563eb' },
-  cardLabelGreen: { color: '#16a34a' },
-  cardScore: { fontSize: 24, fontWeight: 'bold', marginBottom: 2 },
-  cardScoreBlue: { color: '#1d4ed8' },
-  cardScoreGreen: { color: '#15803d' },
-  cardAvg: { fontSize: 8, color: '#64748b' },
-  cardDiff: { fontSize: 8, marginTop: 2 },
-
-  // セクション
-  sectionTitle: { fontSize: 9, fontWeight: 'bold', color: '#1e293b', marginBottom: 8 },
-
-  // 筋肉スコア表
-  tableRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 5, borderBottom: '0.5 solid #f1f5f9' },
-  tableMuscleName: { width: 70, fontSize: 9, color: '#334155' },
-  tableScoreBlock: { flex: 1, marginRight: 6 },
-  tableScoreLabel: { fontSize: 7, color: '#64748b', marginBottom: 2 },
-  barBg: { backgroundColor: '#e2e8f0', borderRadius: 2, height: 6, width: '100%' },
-  barFill: { borderRadius: 2, height: 6 },
-  barBlue: { backgroundColor: '#2563eb' },
-  barGreen: { backgroundColor: '#16a34a' },
-  barOrange: { backgroundColor: '#f59e0b' },
-  tableQuadrant: { width: 60, fontSize: 7, fontWeight: 'bold', textAlign: 'center', borderRadius: 8, paddingVertical: 2, paddingHorizontal: 4 },
-
-  // フィードバック
-  feedbackBox: { borderRadius: 8, padding: '10 12', marginBottom: 6, border: '1 solid' },
-  feedbackYellow: { backgroundColor: '#fefce8', borderColor: '#fef08a' },
-  feedbackTitle: { fontSize: 8, fontWeight: 'bold', color: '#854d0e', marginBottom: 5 },
-  feedbackRow: { flexDirection: 'row', marginBottom: 3 },
-  feedbackBadge: { fontSize: 7, fontWeight: 'bold', borderRadius: 4, paddingVertical: 1, paddingHorizontal: 5, marginRight: 6, alignSelf: 'flex-start' },
-  feedbackBadgeBlue: { backgroundColor: '#dbeafe', color: '#1d4ed8' },
-  feedbackBadgeYellow: { backgroundColor: '#fef9c3', color: '#854d0e' },
-  feedbackBadgeGreen: { backgroundColor: '#dcfce7', color: '#15803d' },
-  feedbackBadgeRed: { backgroundColor: '#fee2e2', color: '#b91c1c' },
-  feedbackText: { fontSize: 8, color: '#713f12', flex: 1, lineHeight: 1.4 },
-
-  // 全体比較セクション
-  compareRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 4, borderBottom: '0.5 solid #f1f5f9' },
-  compareName: { width: 70, fontSize: 9, color: '#334155' },
-  compareBarBlock: { flex: 1, marginRight: 8 },
-  compareScoreText: { width: 32, fontSize: 8, textAlign: 'right' },
-  compareDiffText: { width: 38, fontSize: 8, textAlign: 'right' },
-
-  footer: { borderTop: '0.5 solid #e2e8f0', marginTop: 10, paddingTop: 8, flexDirection: 'row', justifyContent: 'space-between' },
-  footerText: { fontSize: 7, color: '#94a3b8' },
-});
-
-// ===== ヘルパー =====
-function clamp(v: number) { return Math.min(Math.max(v, 0), 100); }
-function pct(score: number) { return clamp(Math.round((score / 5) * 100)); }
 function quadrantLabel(ind: number, org: number) {
   if (ind >= 3 && org >= 3) return '発揮できている';
-  if (ind >= 3 && org < 3) return '環境が阻害中';
-  if (ind < 3 && org >= 3) return '個人が課題';
+  if (ind >= 3 && org < 3)  return '環境が阻害中';
+  if (ind < 3 && org >= 3)  return '個人が課題';
   return '両方に課題';
 }
-function quadrantStyle(ind: number, org: number) {
-  if (ind >= 3 && org >= 3) return { backgroundColor: '#dcfce7', color: '#15803d' };
-  if (ind >= 3 && org < 3) return { backgroundColor: '#fef3c7', color: '#b45309' };
-  if (ind < 3 && org >= 3) return { backgroundColor: '#dbeafe', color: '#1d4ed8' };
-  return { backgroundColor: '#fee2e2', color: '#b91c1c' };
-}
-function diffColor(diff: number) {
-  if (diff >= 0.1) return '#15803d';
-  if (diff <= -0.1) return '#dc2626';
-  return '#94a3b8';
-}
-function diffText(diff: number) {
-  const sign = diff >= 0 ? '+' : '';
-  return `${sign}${diff.toFixed(2)}`;
-}
 
-// ===== PDF コンポーネント =====
-function ResultDocument({
-  organizationName,
-  respondentName,
-  scores,
-  avgScores,
-  surveyDate,
-}: {
-  organizationName: string;
-  respondentName: string;
-  scores: MuscleScore[];
-  avgScores: MuscleScore[] | null;
-  surveyDate: string;
-}) {
-  const avgInd = scores.reduce((s, sc) => s + sc.individual, 0) / scores.length;
-  const avgOrg = scores.reduce((s, sc) => s + sc.organization, 0) / scores.length;
-
-  const groupAvgInd = avgScores ? avgScores.reduce((s, sc) => s + sc.individual, 0) / avgScores.length : null;
-  const groupAvgOrg = avgScores ? avgScores.reduce((s, sc) => s + sc.organization, 0) / avgScores.length : null;
-
-  const sortedByInd = [...scores].sort((a, b) => b.individual - a.individual);
-  const top2 = sortedByInd.slice(0, 2);
-  const bottom2 = sortedByInd.slice(-2).reverse();
-
-  // 全体平均比で際立つ筋肉
-  const aboveAvg = avgScores
-    ? scores
-        .map(s => ({ ...s, diff: s.individual - (avgScores.find(a => a.muscleIndex === s.muscleIndex)?.individual ?? s.individual) }))
-        .filter(s => s.diff >= 0.3)
-        .sort((a, b) => b.diff - a.diff)
-        .slice(0, 2)
-    : [];
-  const belowAvg = avgScores
-    ? scores
-        .map(s => ({ ...s, diff: s.individual - (avgScores.find(a => a.muscleIndex === s.muscleIndex)?.individual ?? s.individual) }))
-        .filter(s => s.diff <= -0.3)
-        .sort((a, b) => a.diff - b.diff)
-        .slice(0, 2)
-    : [];
-
-  return (
-    <Document>
-      <Page size="A4" style={S.page}>
-        {/* ヘッダー */}
-        <View style={S.header}>
-          <Text style={S.headerSub}>デモクラシーフィットネス診断</Text>
-          <Text style={S.headerTitle}>{organizationName}</Text>
-          <Text style={S.headerName}>{respondentName} さんの診断結果レポート　{surveyDate}</Text>
-        </View>
-
-        <View style={S.body}>
-          {/* サマリーカード */}
-          <View style={S.summaryRow}>
-            <View style={[S.card, S.cardBlue]}>
-              <Text style={[S.cardLabel, S.cardLabelBlue]}>個人スコア平均</Text>
-              <Text style={[S.cardScore, S.cardScoreBlue]}>{avgInd.toFixed(2)}</Text>
-              {groupAvgInd !== null && (
-                <>
-                  <Text style={S.cardAvg}>全体平均 {groupAvgInd.toFixed(2)}</Text>
-                  <Text style={[S.cardDiff, { color: diffColor(avgInd - groupAvgInd) }]}>
-                    全体比 {diffText(avgInd - groupAvgInd)}
-                  </Text>
-                </>
-              )}
-            </View>
-            <View style={[S.card, S.cardGreen]}>
-              <Text style={[S.cardLabel, S.cardLabelGreen]}>組織スコア平均</Text>
-              <Text style={[S.cardScore, S.cardScoreGreen]}>{avgOrg.toFixed(2)}</Text>
-              {groupAvgOrg !== null && (
-                <>
-                  <Text style={S.cardAvg}>全体平均 {groupAvgOrg.toFixed(2)}</Text>
-                  <Text style={[S.cardDiff, { color: diffColor(avgOrg - groupAvgOrg) }]}>
-                    全体比 {diffText(avgOrg - groupAvgOrg)}
-                  </Text>
-                </>
-              )}
-            </View>
-          </View>
-
-          {/* 筋肉別スコア（個人 vs 全体平均） */}
-          <Text style={S.sectionTitle}>筋肉別スコア詳細</Text>
-          {scores.map(s => {
-            const avgS = avgScores?.find(a => a.muscleIndex === s.muscleIndex);
-            const diff = avgS ? s.individual - avgS.individual : null;
-            return (
-              <View key={s.muscleIndex} style={S.tableRow}>
-                <Text style={S.tableMuscleName}>{s.muscleName}</Text>
-
-                {/* 個人スコアバー */}
-                <View style={S.tableScoreBlock}>
-                  <Text style={S.tableScoreLabel}>個人 {s.individual.toFixed(2)}{diff !== null ? `  全体比 ${diffText(diff)}` : ''}</Text>
-                  <View style={S.barBg}>
-                    <View style={[S.barFill, S.barBlue, { width: `${pct(s.individual)}%` }]} />
-                  </View>
-                  {avgS && (
-                    <>
-                      <Text style={[S.tableScoreLabel, { marginTop: 3 }]}>全体平均 {avgS.individual.toFixed(2)}</Text>
-                      <View style={S.barBg}>
-                        <View style={[S.barFill, S.barOrange, { width: `${pct(avgS.individual)}%` }]} />
-                      </View>
-                    </>
-                  )}
-                </View>
-
-                {/* 組織スコアバー */}
-                <View style={[S.tableScoreBlock, { marginRight: 8 }]}>
-                  <Text style={S.tableScoreLabel}>組織 {s.organization.toFixed(2)}</Text>
-                  <View style={S.barBg}>
-                    <View style={[S.barFill, S.barGreen, { width: `${pct(s.organization)}%` }]} />
-                  </View>
-                </View>
-
-                {/* 診断 */}
-                <Text style={[S.tableQuadrant, quadrantStyle(s.individual, s.organization)]}>
-                  {quadrantLabel(s.individual, s.organization)}
-                </Text>
-              </View>
-            );
-          })}
-
-          {/* フィードバック */}
-          <View style={{ marginTop: 14 }}>
-            <Text style={S.sectionTitle}>フィードバック</Text>
-
-            <View style={[S.feedbackBox, S.feedbackYellow]}>
-              <Text style={S.feedbackTitle}>個人内の強み・成長ポイント</Text>
-              {top2.map(s => (
-                <View key={`top-${s.muscleIndex}`} style={S.feedbackRow}>
-                  <Text style={[S.feedbackBadge, S.feedbackBadgeBlue]}>強み</Text>
-                  <Text style={S.feedbackText}>「{s.muscleName}」はあなたの10筋肉の中で特に発揮されている強みです（{s.individual.toFixed(2)}）。</Text>
-                </View>
-              ))}
-              {bottom2.map(s => (
-                <View key={`bot-${s.muscleIndex}`} style={S.feedbackRow}>
-                  <Text style={[S.feedbackBadge, S.feedbackBadgeYellow]}>成長</Text>
-                  <Text style={S.feedbackText}>「{s.muscleName}」は相対的に伸びしろのある領域です（{s.individual.toFixed(2)}）。</Text>
-                </View>
-              ))}
-            </View>
-
-            {avgScores && (aboveAvg.length > 0 || belowAvg.length > 0) && (
-              <View style={[S.feedbackBox, { backgroundColor: '#f8fafc', borderColor: '#e2e8f0' }]}>
-                <Text style={[S.feedbackTitle, { color: '#334155' }]}>全体平均との比較</Text>
-                {aboveAvg.map(s => (
-                  <View key={`above-${s.muscleIndex}`} style={S.feedbackRow}>
-                    <Text style={[S.feedbackBadge, S.feedbackBadgeGreen]}>平均以上</Text>
-                    <Text style={[S.feedbackText, { color: '#334155' }]}>「{s.muscleName}」は全体平均より{diffText(s.diff)}高く、チームの中でも際立った強みです。</Text>
-                  </View>
-                ))}
-                {belowAvg.map(s => (
-                  <View key={`below-${s.muscleIndex}`} style={S.feedbackRow}>
-                    <Text style={[S.feedbackBadge, S.feedbackBadgeRed]}>要強化</Text>
-                    <Text style={[S.feedbackText, { color: '#334155' }]}>「{s.muscleName}」は全体平均より{diffText(s.diff)}低い状態です。チームと合わせて強化を検討してみましょう。</Text>
-                  </View>
-                ))}
-              </View>
-            )}
-          </View>
-
-          {/* フッター */}
-          <View style={S.footer}>
-            <Text style={S.footerText}>デモクラ筋診断　きづきくみたて工房</Text>
-            <Text style={S.footerText}>■個人（青）　■全体平均（橙）　■組織（緑）</Text>
-          </View>
-        </View>
-      </Page>
-    </Document>
-  );
-}
-
-// ===== 外部公開関数 =====
 export async function generateResultPdfBuffer(params: {
   organizationName: string;
   respondentName: string;
@@ -295,12 +45,149 @@ export async function generateResultPdfBuffer(params: {
   avgScores: MuscleScore[] | null;
   surveyDate?: string;
 }): Promise<Buffer> {
-  ensureFont();
-  const date = params.surveyDate ?? new Date().toLocaleDateString('ja-JP');
-  const element = React.createElement(ResultDocument, { ...params, surveyDate: date });
-  return await renderToBuffer(element as React.ReactElement<DocumentProps>);
-}
+  const { organizationName, respondentName, scores, avgScores, surveyDate } = params;
+  const date = surveyDate ?? new Date().toLocaleDateString('ja-JP');
 
-// renderToBuffer の型宣言補助
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type DocumentProps = any;
+  // フォント読み込み
+  const fontPath = path.join(process.cwd(), 'public', 'fonts', 'NotoSansJP-Regular.ttf');
+  const fontBytes = fs.readFileSync(fontPath);
+
+  const pdfDoc = await PDFDocument.create();
+
+  // カスタムフォント（日本語）
+  pdfDoc.registerFontkit(await import('@pdf-lib/fontkit').then(m => m.default ?? m));
+  const jpFont = await pdfDoc.embedFont(fontBytes);
+  const monoFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
+
+  const page = pdfDoc.addPage([595, 842]); // A4
+  const { width, height } = page.getSize();
+
+  // ===== ヘッダー =====
+  const headerH = 70;
+  page.drawRectangle({ x: 0, y: height - headerH, width, height: headerH, color: C.darkBg });
+  page.drawText('デモクラシーフィットネス診断', { x: 24, y: height - 22, size: 8, font: jpFont, color: rgb(0.58, 0.64, 0.72) });
+  page.drawText(organizationName, { x: 24, y: height - 40, size: 16, font: jpFont, color: C.white });
+  page.drawText(`${respondentName} さんの診断結果レポート　${date}`, { x: 24, y: height - 58, size: 9, font: jpFont, color: rgb(0.78, 0.83, 0.90) });
+
+  // ===== サマリーカード =====
+  const avgInd = scores.reduce((s, sc) => s + sc.individual, 0) / scores.length;
+  const avgOrg = scores.reduce((s, sc) => s + sc.organization, 0) / scores.length;
+  const groupAvgInd = avgScores ? avgScores.reduce((s, sc) => s + sc.individual, 0) / avgScores.length : null;
+  const groupAvgOrg = avgScores ? avgScores.reduce((s, sc) => s + sc.organization, 0) / avgScores.length : null;
+
+  const cardY = height - headerH - 10;
+  const cardH = 72;
+
+  // 個人スコアカード（左）
+  page.drawRectangle({ x: 24, y: cardY - cardH, width: 260, height: cardH, color: rgb(0.94, 0.97, 1.0), borderColor: rgb(0.75, 0.86, 0.99), borderWidth: 1 });
+  page.drawText('個人スコア平均', { x: 36, y: cardY - 18, size: 8, font: jpFont, color: C.blue600 });
+  page.drawText(avgInd.toFixed(2), { x: 36, y: cardY - 42, size: 22, font: monoFont, color: C.blue600 });
+  if (groupAvgInd !== null) {
+    const diff = avgInd - groupAvgInd;
+    page.drawText(`全体平均 ${groupAvgInd.toFixed(2)}`, { x: 140, y: cardY - 36, size: 8, font: jpFont, color: C.slate500 });
+    page.drawText(`全体比 ${diffStr(diff)}`, { x: 140, y: cardY - 52, size: 8, font: jpFont, color: diff >= 0.05 ? C.plus : diff <= -0.05 ? C.minus : C.neutral });
+  }
+
+  // 組織スコアカード（右）
+  page.drawRectangle({ x: 308, y: cardY - cardH, width: 260, height: cardH, color: rgb(0.94, 1.0, 0.97), borderColor: rgb(0.73, 0.97, 0.82), borderWidth: 1 });
+  page.drawText('組織スコア平均', { x: 320, y: cardY - 18, size: 8, font: jpFont, color: C.green600 });
+  page.drawText(avgOrg.toFixed(2), { x: 320, y: cardY - 42, size: 22, font: monoFont, color: C.green600 });
+  if (groupAvgOrg !== null) {
+    const diff = avgOrg - groupAvgOrg;
+    page.drawText(`全体平均 ${groupAvgOrg.toFixed(2)}`, { x: 424, y: cardY - 36, size: 8, font: jpFont, color: C.slate500 });
+    page.drawText(`全体比 ${diffStr(diff)}`, { x: 424, y: cardY - 52, size: 8, font: jpFont, color: diff >= 0.05 ? C.plus : diff <= -0.05 ? C.minus : C.neutral });
+  }
+
+  // ===== 筋肉別スコア =====
+  const tableStartY = cardY - cardH - 20;
+  page.drawText('筋肉別スコア詳細', { x: 24, y: tableStartY, size: 10, font: jpFont, color: C.slate700 });
+
+  const rowH = 46;
+  const barMaxW = 160;
+  const labelX = 24;
+  const barX = 110;
+  const orgBarX = 310;
+  const scoreX = 276;
+  const quadrantX = 460;
+
+  scores.forEach((s, i) => {
+    const rowY = tableStartY - 14 - i * rowH;
+    const avgS = avgScores?.find(a => a.muscleIndex === s.muscleIndex);
+
+    // 行区切り線
+    page.drawLine({ start: { x: 24, y: rowY + rowH - 2 }, end: { x: 571, y: rowY + rowH - 2 }, thickness: 0.4, color: rgb(0.94, 0.95, 0.96) });
+
+    // 筋肉名
+    page.drawText(s.muscleName, { x: labelX, y: rowY + 28, size: 9, font: jpFont, color: C.slate700 });
+
+    // 個人バー
+    page.drawText('個人', { x: barX, y: rowY + 36, size: 7, font: jpFont, color: C.blue600 });
+    page.drawRectangle({ x: barX, y: rowY + 26, width: barMaxW, height: 7, color: C.barBg });
+    page.drawRectangle({ x: barX, y: rowY + 26, width: barMaxW * clamp01(s.individual), height: 7, color: C.blue600 });
+
+    // 全体平均バー
+    if (avgS) {
+      page.drawText('全体', { x: barX, y: rowY + 20, size: 7, font: jpFont, color: C.orange });
+      page.drawRectangle({ x: barX, y: rowY + 10, width: barMaxW, height: 7, color: C.barBg });
+      page.drawRectangle({ x: barX, y: rowY + 10, width: barMaxW * clamp01(avgS.individual), height: 7, color: C.orange });
+    }
+
+    // 組織バー
+    page.drawText('組織', { x: orgBarX, y: rowY + 36, size: 7, font: jpFont, color: C.green600 });
+    page.drawRectangle({ x: orgBarX, y: rowY + 26, width: barMaxW, height: 7, color: C.barBg });
+    page.drawRectangle({ x: orgBarX, y: rowY + 26, width: barMaxW * clamp01(s.organization), height: 7, color: C.green600 });
+
+    // スコア数値
+    page.drawText(`${s.individual.toFixed(2)}`, { x: scoreX, y: rowY + 28, size: 8, font: monoFont, color: C.blue600 });
+    if (avgS) {
+      const diff = s.individual - avgS.individual;
+      page.drawText(diffStr(diff), { x: scoreX, y: rowY + 16, size: 7, font: monoFont, color: diff >= 0.05 ? C.plus : diff <= -0.05 ? C.minus : C.neutral });
+    }
+
+    // 象限ラベル
+    const qlabel = quadrantLabel(s.individual, s.organization);
+    page.drawText(qlabel, { x: quadrantX, y: rowY + 24, size: 7, font: jpFont, color: C.slate500 });
+  });
+
+  // ===== フィードバック =====
+  const fbStartY = tableStartY - 14 - scores.length * rowH - 10;
+  page.drawLine({ start: { x: 24, y: fbStartY + 14 }, end: { x: 571, y: fbStartY + 14 }, thickness: 0.5, color: rgb(0.88, 0.91, 0.94) });
+  page.drawText('フィードバック', { x: 24, y: fbStartY, size: 10, font: jpFont, color: C.slate700 });
+
+  const sortedByInd = [...scores].sort((a, b) => b.individual - a.individual);
+  const feedbackLines: { badge: string; text: string; badgeColor: typeof C.blue600 }[] = [];
+
+  // 強み・成長ポイント
+  sortedByInd.slice(0, 2).forEach(s => {
+    feedbackLines.push({ badge: '強み', text: `「${s.muscleName}」はあなたの10筋肉で特に発揮されている強みです（${s.individual.toFixed(2)}）`, badgeColor: C.blue600 });
+  });
+  sortedByInd.slice(-2).reverse().forEach(s => {
+    feedbackLines.push({ badge: '成長', text: `「${s.muscleName}」は相対的に伸びしろのある領域です（${s.individual.toFixed(2)}）`, badgeColor: rgb(0.78, 0.62, 0.04) });
+  });
+
+  // 全体平均比
+  if (avgScores) {
+    const diffs = scores.map(s => ({ ...s, diff: s.individual - (avgScores.find(a => a.muscleIndex === s.muscleIndex)?.individual ?? s.individual) }));
+    diffs.filter(s => s.diff >= 0.3).slice(0, 2).forEach(s => {
+      feedbackLines.push({ badge: '平均以上', text: `「${s.muscleName}」は全体平均より${diffStr(s.diff)}高く、チームの中でも際立った強みです`, badgeColor: C.green600 });
+    });
+    diffs.filter(s => s.diff <= -0.3).slice(-2).reverse().forEach(s => {
+      feedbackLines.push({ badge: '要強化', text: `「${s.muscleName}」は全体平均より${diffStr(s.diff)}低い状態です。チームと合わせて強化を検討してみましょう`, badgeColor: C.minus });
+    });
+  }
+
+  feedbackLines.forEach((line, i) => {
+    const lineY = fbStartY - 16 - i * 16;
+    page.drawText(`[${line.badge}]`, { x: 24, y: lineY, size: 7.5, font: jpFont, color: line.badgeColor });
+    page.drawText(line.text, { x: 80, y: lineY, size: 7.5, font: jpFont, color: C.slate700 });
+  });
+
+  // ===== 凡例・フッター =====
+  const footerY = 20;
+  page.drawLine({ start: { x: 24, y: footerY + 14 }, end: { x: 571, y: footerY + 14 }, thickness: 0.4, color: C.barBg });
+  page.drawText('デモクラ筋診断　きづきくみたて工房', { x: 24, y: footerY, size: 7, font: jpFont, color: C.neutral });
+  page.drawText('■個人（青）　■全体平均（橙）　■組織（緑）', { x: 350, y: footerY, size: 7, font: jpFont, color: C.neutral });
+
+  const pdfBytes = await pdfDoc.save();
+  return Buffer.from(pdfBytes);
+}
