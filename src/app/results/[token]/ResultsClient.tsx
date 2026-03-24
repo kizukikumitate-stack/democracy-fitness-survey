@@ -502,6 +502,56 @@ export default function ResultsClient({ token, organizationName }: Props) {
   const formatDate = (dateStr: string) =>
     new Date(dateStr).toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' });
 
+  const downloadCSV = () => {
+    const muscleNames = MUSCLES.map(m => m.name);
+
+    // ヘッダー行
+    const headers = [
+      '名前', '回答日', '診断種別',
+      ...muscleNames.flatMap(name => [`${name}（個人）`, `${name}（組織）`]),
+      '個人スコア平均', '組織スコア平均',
+    ];
+
+    // データ行
+    const rows = individuals.map(person => {
+      const avgInd = person.scores.reduce((s, sc) => s + sc.individual, 0) / person.scores.length;
+      const avgOrg = person.scores.reduce((s, sc) => s + sc.organization, 0) / person.scores.length;
+      const date = new Date(person.createdAt).toLocaleDateString('ja-JP');
+      const typeLabel = person.surveyType === 'behavior' ? '行動実績' : '意識調査';
+      return [
+        person.name,
+        date,
+        typeLabel,
+        ...person.scores.flatMap(s => [s.individual.toFixed(2), s.organization.toFixed(2)]),
+        avgInd.toFixed(2),
+        avgOrg.toFixed(2),
+      ];
+    });
+
+    // 全体平均行
+    const avgRow = [
+      '【全体平均】', '', '',
+      ...results!.scores.flatMap(s => [s.individual.toFixed(2), s.organization.toFixed(2)]),
+      (results!.scores.reduce((s, sc) => s + sc.individual, 0) / results!.scores.length).toFixed(2),
+      (results!.scores.reduce((s, sc) => s + sc.organization, 0) / results!.scores.length).toFixed(2),
+    ];
+
+    const csvContent = [headers, ...rows, [], avgRow]
+      .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+      .join('\n');
+
+    const bom = '\uFEFF'; // Excel で文字化けしないよう BOM 付き UTF-8
+    const blob = new Blob([bom + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    const label = SURVEY_TYPE_LABELS[surveyTypeFilter];
+    const fileName = `${organizationName}_${label}_${new Date().toLocaleDateString('ja-JP').replace(/\//g, '')}.csv`;
+    link.href = url;
+    link.download = fileName;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
@@ -553,7 +603,20 @@ export default function ResultsClient({ token, organizationName }: Props) {
       <header className="bg-white border-b border-slate-200 shadow-sm">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
           <Logo size="md" showSubtitle />
-          <a href="/" className="text-sm text-slate-500 hover:text-slate-700 transition">管理画面へ</a>
+          <div className="flex items-center gap-3">
+            {individuals.length > 0 && (
+              <button
+                onClick={downloadCSV}
+                className="flex items-center gap-1.5 text-sm text-slate-600 border border-slate-300 rounded-lg px-3 py-1.5 hover:bg-slate-50 transition"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+                CSVダウンロード
+              </button>
+            )}
+            <a href="/" className="text-sm text-slate-500 hover:text-slate-700 transition">管理画面へ</a>
+          </div>
         </div>
       </header>
 
