@@ -1,4 +1,5 @@
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
+import fontkit from '@pdf-lib/fontkit';
 import fs from 'fs';
 import path from 'path';
 
@@ -48,14 +49,32 @@ export async function generateResultPdfBuffer(params: {
   const { organizationName, respondentName, scores, avgScores, surveyDate } = params;
   const date = surveyDate ?? new Date().toLocaleDateString('ja-JP');
 
-  // フォント読み込み
-  const fontPath = path.join(process.cwd(), 'public', 'fonts', 'NotoSansJP-Regular.ttf');
-  const fontBytes = fs.readFileSync(fontPath);
+  // フォント読み込み（複数パスを試みる）
+  const possiblePaths = [
+    path.join(process.cwd(), 'public', 'fonts', 'NotoSansJP-Regular.ttf'),
+    path.join(process.cwd(), 'fonts', 'NotoSansJP-Regular.ttf'),
+    path.join('/var/task/public/fonts/NotoSansJP-Regular.ttf'), // Vercel Lambda
+  ];
+  let fontBytes: Buffer | null = null;
+  for (const p of possiblePaths) {
+    if (fs.existsSync(p)) {
+      fontBytes = fs.readFileSync(p);
+      console.log('Font loaded from:', p, 'size:', fontBytes.length);
+      break;
+    }
+  }
+  if (!fontBytes) {
+    // フォントが見つからない場合はURLから取得
+    console.log('Font file not found locally, fetching from URL...');
+    const res = await fetch('https://democracy-fitness-survey.vercel.app/fonts/NotoSansJP-Regular.ttf');
+    fontBytes = Buffer.from(await res.arrayBuffer());
+    console.log('Font fetched from URL, size:', fontBytes.length);
+  }
 
   const pdfDoc = await PDFDocument.create();
 
   // カスタムフォント（日本語）
-  pdfDoc.registerFontkit(await import('@pdf-lib/fontkit').then(m => m.default ?? m));
+  pdfDoc.registerFontkit(fontkit);
   const jpFont = await pdfDoc.embedFont(fontBytes);
   const monoFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
 
