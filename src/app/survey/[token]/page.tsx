@@ -119,11 +119,14 @@ export default function SurveyPage() {
   const blind = searchParams.get('blind') === '1';
   const behavior = searchParams.get('behavior') === '1';
 
+  const DRAFT_KEY = `survey_draft_${token}`;
+
   const [pageState, setPageState] = useState<PageState>('loading');
   const [organizationName, setOrganizationName] = useState('');
   const [respondentName, setRespondentName] = useState('');
   const [respondentDate, setRespondentDate] = useState('');
   const [answers, setAnswers] = useState<Answers>({});
+  const [draftRestored, setDraftRestored] = useState(false);
 
   // Shuffle questions every session (both normal and blind mode)
   const shuffledPart1 = useMemo(() => shuffle(LAYER1_QUESTIONS), []);
@@ -136,6 +139,23 @@ export default function SurveyPage() {
         if (res.ok) {
           const data = await res.json();
           setOrganizationName(data.organizationName);
+
+          // 下書き復元
+          try {
+            const saved = localStorage.getItem(DRAFT_KEY);
+            if (saved) {
+              const draft = JSON.parse(saved);
+              if (draft.answers && Object.keys(draft.answers).length > 0) {
+                setAnswers(draft.answers);
+                if (draft.respondentName) setRespondentName(draft.respondentName);
+                if (draft.respondentDate) setRespondentDate(draft.respondentDate);
+                setPageState(draft.pageState === 'part2' ? 'part2' : 'part1');
+                setDraftRestored(true);
+                return;
+              }
+            }
+          } catch { /* localStorage が使えない環境では無視 */ }
+
           setPageState('part1');
         } else {
           setPageState('not_found');
@@ -145,7 +165,16 @@ export default function SurveyPage() {
       }
     };
     fetchSurvey();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
+
+  // 回答が変わるたびに自動保存
+  useEffect(() => {
+    if (pageState !== 'part1' && pageState !== 'part2') return;
+    try {
+      localStorage.setItem(DRAFT_KEY, JSON.stringify({ answers, respondentName, respondentDate, pageState }));
+    } catch { /* 無視 */ }
+  }, [answers, respondentName, respondentDate, pageState, DRAFT_KEY]);
 
   const handleAnswer = (id: string, score: number) => {
     setAnswers(prev => ({ ...prev, [id]: score }));
@@ -171,6 +200,7 @@ export default function SurveyPage() {
         }),
       });
       if (res.ok) {
+        try { localStorage.removeItem(DRAFT_KEY); } catch { /* 無視 */ }
         setPageState('done');
       } else {
         setPageState('error');
@@ -223,16 +253,28 @@ export default function SurveyPage() {
   }
 
   if (pageState === 'error') {
+    const answeredCount = Object.keys(answers).length;
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center px-4">
-        <div className="text-center">
-          <h1 className="text-xl font-bold text-red-600 mb-2">エラーが発生しました</h1>
-          <p className="text-slate-500 text-sm mb-4">もう一度お試しください。</p>
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-8 max-w-sm w-full text-center">
+          <div className="w-14 h-14 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg className="w-7 h-7 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M12 3a9 9 0 100 18A9 9 0 0012 3z" />
+            </svg>
+          </div>
+          <h1 className="text-lg font-bold text-red-600 mb-2">送信エラーが発生しました</h1>
+          <p className="text-slate-500 text-sm mb-4">通信エラーが起きた可能性があります。</p>
+          {answeredCount > 0 && (
+            <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-5 text-left">
+              <p className="text-xs font-semibold text-green-700 mb-0.5">入力内容は自動保存されています</p>
+              <p className="text-xs text-green-600">「続きから回答する」を押すと、{answeredCount}問分の回答が復元されます。</p>
+            </div>
+          )}
           <button
-            onClick={() => setPageState('part1')}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm"
+            onClick={() => setPageState(Object.keys(answers).some(id => LAYER2_QUESTIONS.find(q => q.id === id)) ? 'part2' : 'part1')}
+            className="w-full px-4 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition"
           >
-            戻る
+            {answeredCount > 0 ? '続きから回答する' : '最初から回答する'}
           </button>
         </div>
       </div>
@@ -285,6 +327,34 @@ export default function SurveyPage() {
       </header>
 
       <main className="max-w-3xl mx-auto px-4 sm:px-6 py-6">
+        {/* 下書き復元バナー */}
+        {draftRestored && (
+          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-5 flex items-start justify-between gap-3">
+            <div className="flex gap-2.5 items-start">
+              <svg className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              <div>
+                <p className="text-sm font-medium text-blue-800">前回の入力内容を復元しました</p>
+                <p className="text-xs text-blue-600 mt-0.5">続きから回答できます。最初からやり直す場合は右の「クリア」を押してください。</p>
+              </div>
+            </div>
+            <button
+              onClick={() => {
+                try { localStorage.removeItem(DRAFT_KEY); } catch { /* 無視 */ }
+                setAnswers({});
+                setRespondentName('');
+                setRespondentDate('');
+                setPageState('part1');
+                setDraftRestored(false);
+              }}
+              className="flex-shrink-0 text-xs text-blue-500 border border-blue-300 rounded px-2 py-1 hover:bg-blue-100 transition"
+            >
+              クリア
+            </button>
+          </div>
+        )}
+
         {/* Intro message (only on part1) */}
         {isPartOne && (
           <div className="bg-amber-50 border border-amber-200 rounded-xl p-5 mb-6">
