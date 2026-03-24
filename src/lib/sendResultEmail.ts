@@ -183,8 +183,9 @@ export async function sendResultEmail({
       scores,
       avgScores: avgScores ?? null,
     });
+    console.log('PDF generation succeeded, size:', pdfBuffer?.length);
   } catch (e) {
-    console.error('PDF generation failed (non-fatal):', e);
+    console.error('PDF generation failed:', JSON.stringify(e), e);
   }
 
   const attachments = pdfBuffer
