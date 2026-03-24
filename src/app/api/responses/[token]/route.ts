@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
-import { QUESTIONS } from '@/lib/questions';
+import { QUESTIONS, MUSCLES, transformScore } from '@/lib/questions';
 import { sendResultEmail } from '@/lib/sendResultEmail';
 
 export async function POST(
@@ -70,14 +70,47 @@ export async function POST(
 
     if (error) throw error;
 
-    // メールアドレスが入力されていれば結果メールを非同期送信
+    // メールアドレスが入力されていれば結果メールを非同期送信（全体平均も計算して渡す）
     if (email) {
-      sendResultEmail({
-        to: email,
-        organizationName: survey.organization_name,
-        respondentName: name,
-        answers,
-      }).catch(e => console.error('sendResultEmail failed (non-fatal):', e));
+      (async () => {
+        try {
+          // 全回答を取得して全体平均スコアを計算
+          const { data: allResponses } = await supabase
+            .from('responses')
+            .select('answers')
+            .eq('survey_token', params.token);
+
+          let avgScores = null;
+          if (allResponses && allResponses.length > 1) {
+            avgScores = MUSCLES.map(muscle => {
+              const l1 = QUESTIONS.filter(q => q.muscleIndex === muscle.index && q.layer === 1);
+              const l2 = QUESTIONS.filter(q => q.muscleIndex === muscle.index && q.layer === 2);
+              const indVals = allResponses.map(r =>
+                l1.map(q => transformScore(r.answers[q.id] ?? 3, q.reversed)).reduce((s, v) => s + v, 0) / l1.length
+              );
+              const orgVals = allResponses.map(r =>
+                l2.map(q => transformScore(r.answers[q.id] ?? 3, q.reversed)).reduce((s, v) => s + v, 0) / l2.length
+              );
+              return {
+                muscleIndex: muscle.index,
+                muscleName: muscle.name,
+                individual: indVals.reduce((s, v) => s + v, 0) / indVals.length,
+                organization: orgVals.reduce((s, v) => s + v, 0) / orgVals.length,
+              };
+            });
+          }
+
+          await sendResultEmail({
+            to: email,
+            organizationName: survey.organization_name,
+            respondentName: name,
+            answers,
+            avgScores,
+          });
+        } catch (e) {
+          console.error('sendResultEmail failed (non-fatal):', e);
+        }
+      })();
     }
 
     return NextResponse.json({ success: true, id: data.id }, { status: 201 });

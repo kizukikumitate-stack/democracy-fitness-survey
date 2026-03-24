@@ -1,5 +1,6 @@
 import { Resend } from 'resend';
 import { MUSCLES, QUESTIONS, transformScore } from './questions';
+import { generateResultPdfBuffer } from './generateResultPdf';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 const FROM_EMAIL = process.env.RESEND_FROM_EMAIL ?? 'onboarding@resend.dev';
@@ -161,20 +162,41 @@ export async function sendResultEmail({
   organizationName,
   respondentName,
   answers,
+  avgScores,
 }: {
   to: string;
   organizationName: string;
   respondentName: string;
   answers: Record<string, number>;
+  avgScores?: MuscleScore[] | null;
 }) {
   const scores = await computeScoresFromAnswers(answers);
-  const html = buildHtml(organizationName, respondentName || '回答者', scores);
+  const name = respondentName || '回答者';
+  const html = buildHtml(organizationName, name, scores);
+
+  // PDF生成（失敗してもメール本文は送る）
+  let pdfBuffer: Buffer | null = null;
+  try {
+    pdfBuffer = await generateResultPdfBuffer({
+      organizationName,
+      respondentName: name,
+      scores,
+      avgScores: avgScores ?? null,
+    });
+  } catch (e) {
+    console.error('PDF generation failed (non-fatal):', e);
+  }
+
+  const attachments = pdfBuffer
+    ? [{ filename: `${organizationName}_診断結果.pdf`, content: pdfBuffer }]
+    : [];
 
   const { error } = await resend.emails.send({
     from: FROM_EMAIL,
     to,
     subject: `【デモクラ筋診断】${organizationName} の診断結果`,
     html,
+    attachments,
   });
 
   if (error) {
