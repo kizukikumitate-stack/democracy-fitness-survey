@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { QUESTIONS } from '@/lib/questions';
+import { sendResultEmail } from '@/lib/sendResultEmail';
 
 export async function POST(
   req: NextRequest,
@@ -18,7 +19,7 @@ export async function POST(
     }
 
     const body = await req.json();
-    const { respondentName, answers, surveyType } = body;
+    const { respondentName, respondentEmail, answers, surveyType } = body;
 
     if (!answers || typeof answers !== 'object') {
       return NextResponse.json({ error: 'answers は必須です' }, { status: 400 });
@@ -36,25 +37,29 @@ export async function POST(
       );
     }
 
-    // まず survey_type 列込みで INSERT を試みる
+    const name = respondentName?.trim() || '匿名';
+    const email = typeof respondentEmail === 'string' ? respondentEmail.trim() : '';
+
+    // まず全列込みで INSERT を試みる
     let { data, error } = await supabase
       .from('responses')
       .insert({
         survey_token: params.token,
-        respondent_name: respondentName?.trim() || '匿名',
+        respondent_name: name,
+        respondent_email: email || null,
         answers: answers,
         survey_type: surveyType === 'behavior' ? 'behavior' : 'attitude',
       })
       .select()
       .single();
 
-    // survey_type 列が存在しない場合（マイグレーション未実施）はなしで再試行
-    if (error && error.message?.includes('survey_type')) {
+    // 列が存在しない場合（マイグレーション未実施）は最小限で再試行
+    if (error && (error.message?.includes('survey_type') || error.message?.includes('respondent_email'))) {
       const retry = await supabase
         .from('responses')
         .insert({
           survey_token: params.token,
-          respondent_name: respondentName?.trim() || '匿名',
+          respondent_name: name,
           answers: answers,
         })
         .select()
@@ -64,6 +69,16 @@ export async function POST(
     }
 
     if (error) throw error;
+
+    // メールアドレスが入力されていれば結果メールを非同期送信
+    if (email) {
+      sendResultEmail({
+        to: email,
+        organizationName: survey.organization_name,
+        respondentName: name,
+        answers,
+      }).catch(e => console.error('sendResultEmail failed (non-fatal):', e));
+    }
 
     return NextResponse.json({ success: true, id: data.id }, { status: 201 });
   } catch (err) {

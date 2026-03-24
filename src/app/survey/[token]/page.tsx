@@ -124,6 +124,7 @@ export default function SurveyPage() {
   const [pageState, setPageState] = useState<PageState>('loading');
   const [organizationName, setOrganizationName] = useState('');
   const [respondentName, setRespondentName] = useState('');
+  const [respondentEmail, setRespondentEmail] = useState('');
   const [respondentDate, setRespondentDate] = useState('');
   const [answers, setAnswers] = useState<Answers>({});
   const [draftRestored, setDraftRestored] = useState(false);
@@ -148,6 +149,7 @@ export default function SurveyPage() {
               if (draft.answers && Object.keys(draft.answers).length > 0) {
                 setAnswers(draft.answers);
                 if (draft.respondentName) setRespondentName(draft.respondentName);
+                if (draft.respondentEmail) setRespondentEmail(draft.respondentEmail);
                 if (draft.respondentDate) setRespondentDate(draft.respondentDate);
                 setPageState(draft.pageState === 'part2' ? 'part2' : 'part1');
                 setDraftRestored(true);
@@ -172,7 +174,7 @@ export default function SurveyPage() {
   useEffect(() => {
     if (pageState !== 'part1' && pageState !== 'part2') return;
     try {
-      localStorage.setItem(DRAFT_KEY, JSON.stringify({ answers, respondentName, respondentDate, pageState }));
+      localStorage.setItem(DRAFT_KEY, JSON.stringify({ answers, respondentName, respondentEmail, respondentDate, pageState }));
     } catch { /* 無視 */ }
   }, [answers, respondentName, respondentDate, pageState, DRAFT_KEY]);
 
@@ -194,6 +196,7 @@ export default function SurveyPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           respondentName: respondentName.trim() || '匿名',
+          respondentEmail: respondentEmail.trim(),
           respondentDate: respondentDate || '',
           answers,
           surveyType: behavior ? 'behavior' : 'attitude',
@@ -241,9 +244,15 @@ export default function SurveyPage() {
           <p className="text-slate-500 mb-2">
             <span className="font-medium text-slate-700">{organizationName}</span> のサーベイへの回答が完了しました。
           </p>
-          <p className="text-slate-400 text-sm">
-            あなたの回答は組織の対話力診断に活用されます。
-          </p>
+          {respondentEmail ? (
+            <p className="text-slate-500 text-sm">
+              <span className="font-medium text-blue-600">{respondentEmail}</span> に診断結果をお送りしました。
+            </p>
+          ) : (
+            <p className="text-slate-400 text-sm">
+              あなたの回答は組織の対話力診断に活用されます。
+            </p>
+          )}
           <div className="mt-6 pt-6 border-t border-slate-100">
             <Logo size="sm" showSubtitle />
           </div>
@@ -344,6 +353,7 @@ export default function SurveyPage() {
                 try { localStorage.removeItem(DRAFT_KEY); } catch { /* 無視 */ }
                 setAnswers({});
                 setRespondentName('');
+                setRespondentEmail('');
                 setRespondentDate('');
                 setPageState('part1');
                 setDraftRestored(false);
@@ -389,9 +399,9 @@ export default function SurveyPage() {
           </p>
         </div>
 
-        {/* Name & Date input (only on part1) */}
+        {/* Name / Email / Date input (only on part1) */}
         {isPartOne && (
-          <div className="bg-white rounded-xl border border-slate-200 p-5 mb-6">
+          <div className="bg-white rounded-xl border border-slate-200 p-5 mb-6 space-y-4">
             <div className="flex flex-col sm:flex-row gap-4">
               <div className="flex-1">
                 <label className="block text-sm font-medium text-slate-700 mb-2">
@@ -416,6 +426,21 @@ export default function SurveyPage() {
                   className="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
                 />
               </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                メールアドレス（任意）
+              </label>
+              <input
+                type="email"
+                value={respondentEmail}
+                onChange={e => setRespondentEmail(e.target.value)}
+                placeholder="入力すると診断結果がメールで届きます"
+                className="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+              />
+              {respondentEmail && (
+                <p className="text-xs text-blue-600 mt-1.5">回答送信後に結果をメールでお届けします</p>
+              )}
             </div>
           </div>
         )}
