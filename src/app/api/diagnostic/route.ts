@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Resend } from 'resend';
 import { supabase } from '@/lib/supabase';
+import { createSupabaseAdminClient } from '@/lib/supabaseAdmin';
 
 const FROM_EMAIL = process.env.RESEND_FROM_EMAIL ?? 'onboarding@resend.dev';
 const RESEND_AUDIENCE_ID = process.env.RESEND_DIAGNOSTIC_AUDIENCE_ID;
@@ -113,15 +114,101 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Email service not configured' }, { status: 500, headers: cors });
     }
 
-    // 1. Supabase に回答を保存（顧客台帳）。失敗してもメール送信は続行する
+    const trimmedName = typeof name === 'string' && name.trim() ? name.trim() : null;
+    const trimmedIndustry = typeof industry === 'string' && industry.trim() ? industry.trim() : null;
+    const trimmedRole = typeof role === 'string' && role.trim() ? role.trim() : null;
+    const emailNormalized = email.toLowerCase().trim();
+
+    // 1. customers (顧客マスタ) を email キーで upsert。
+    //    既存スキーマ(bem_diagnostic_count などのチャネル別カウンタ方式)に従う。
+    //    SUPABASE_SERVICE_ROLE_KEY が未設定なら admin クライアントは作れず、
+    //    customers への書き込みはスキップされ、diagnostic_responses 側だけ動く。
+    let supabaseAdmin: ReturnType<typeof createSupabaseAdminClient> | null = null;
     try {
-      const { error: dbError } = await supabase
+      supabaseAdmin = createSupabaseAdminClient();
+    } catch (e) {
+      console.error('POST /api/diagnostic admin client init error:', e);
+    }
+
+    if (supabaseAdmin) {
+      try {
+        const now = new Date().toISOString();
+        const { data: existing, error: selErr } = await supabaseAdmin
+          .from('customers')
+          .select(
+            'email, name, bem_diagnostic_count, newsletter_opt_in, newsletter_consent_source, newsletter_consent_at, first_seen_at',
+          )
+          .eq('email', emailNormalized)
+          .maybeSingle();
+        if (selErr) {
+          console.error('POST /api/diagnostic customers select error:', selErr);
+        }
+
+        if (existing) {
+          // 既存顧客: BEM 診断カウンタを +1、最終受診情報を更新。
+          // メルマガ同意はスティッキー true、初回同意ソース・日時は保持。
+          const updates: Record<string, unknown> = {
+            bem_diagnostic_count: (existing.bem_diagnostic_count ?? 0) + 1,
+            bem_diagnostic_last_at: now,
+            bem_diagnostic_last_type: typeKey,
+            last_seen_at: now,
+          };
+          if (!existing.name && trimmedName) {
+            updates.name = trimmedName;
+          }
+          if (wantsNewsletter) {
+            if (!existing.newsletter_opt_in) {
+              updates.newsletter_opt_in = true;
+            }
+            if (!existing.newsletter_consent_source) {
+              updates.newsletter_consent_source = 'bem-diagnostic';
+            }
+            if (!existing.newsletter_consent_at) {
+              updates.newsletter_consent_at = now;
+            }
+          }
+          const { error: updErr } = await supabaseAdmin
+            .from('customers')
+            .update(updates)
+            .eq('email', emailNormalized);
+          if (updErr) {
+            console.error('POST /api/diagnostic customers update error:', updErr);
+          }
+        } else {
+          // 新規顧客: 1件目の BEM 診断として記録。
+          const { error: insErr } = await supabaseAdmin
+            .from('customers')
+            .insert({
+              email: emailNormalized,
+              name: trimmedName,
+              newsletter_opt_in: wantsNewsletter,
+              newsletter_consent_source: wantsNewsletter ? 'bem-diagnostic' : null,
+              newsletter_consent_at: wantsNewsletter ? now : null,
+              bem_diagnostic_count: 1,
+              bem_diagnostic_last_at: now,
+              bem_diagnostic_last_type: typeKey,
+              first_seen_at: now,
+              last_seen_at: now,
+            });
+          if (insErr) {
+            console.error('POST /api/diagnostic customers insert error:', insErr);
+          }
+        }
+      } catch (e) {
+        console.error('POST /api/diagnostic customers exception:', e);
+      }
+    }
+
+    // 2. diagnostic_responses に回答を保存。失敗してもメール送信は続行する
+    try {
+      const client = supabaseAdmin ?? supabase;
+      const { error: dbError } = await client
         .from('diagnostic_responses')
         .insert({
-          email,
-          name: typeof name === 'string' && name.trim() ? name.trim() : null,
-          industry: typeof industry === 'string' && industry.trim() ? industry.trim() : null,
-          role: typeof role === 'string' && role.trim() ? role.trim() : null,
+          email: emailNormalized,
+          name: trimmedName,
+          industry: trimmedIndustry,
+          role: trimmedRole,
           type: typeKey,
           scores: scores && typeof scores === 'object' ? scores : null,
           answers: answers && typeof answers === 'object' ? answers : null,
