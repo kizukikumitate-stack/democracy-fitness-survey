@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Resend } from 'resend';
+import { supabase } from '@/lib/supabase';
 
 const FROM_EMAIL = process.env.RESEND_FROM_EMAIL ?? 'onboarding@resend.dev';
+const RESEND_AUDIENCE_ID = process.env.RESEND_DIAGNOSTIC_AUDIENCE_ID;
 
 const ALLOWED_ORIGINS = [
   'https://kizukikumitate.com',
@@ -63,10 +65,25 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400, headers: cors });
     }
 
-    const { email, name, type, source } = body as {
+    const {
+      email,
+      name,
+      industry,
+      role,
+      type,
+      scores,
+      answers,
+      newsletterOptIn,
+      source,
+    } = body as {
       email?: unknown;
       name?: unknown;
+      industry?: unknown;
+      role?: unknown;
       type?: unknown;
+      scores?: unknown;
+      answers?: unknown;
+      newsletterOptIn?: unknown;
       source?: unknown;
     };
 
@@ -86,6 +103,7 @@ export async function POST(req: NextRequest) {
 
     const pdfUrl = `${PDF_BASE}/type-${typeKey.toLowerCase()}.pdf`;
     const displayName = typeof name === 'string' && name.trim() ? name.trim() : 'お客様';
+    const wantsNewsletter = newsletterOptIn === true;
 
     const html = buildHtml(displayName, typeKey, typeInfo, pdfUrl);
 
@@ -95,6 +113,46 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Email service not configured' }, { status: 500, headers: cors });
     }
 
+    // 1. Supabase に回答を保存（顧客台帳）。失敗してもメール送信は続行する
+    try {
+      const { error: dbError } = await supabase
+        .from('diagnostic_responses')
+        .insert({
+          email,
+          name: typeof name === 'string' && name.trim() ? name.trim() : null,
+          industry: typeof industry === 'string' && industry.trim() ? industry.trim() : null,
+          role: typeof role === 'string' && role.trim() ? role.trim() : null,
+          type: typeKey,
+          scores: scores && typeof scores === 'object' ? scores : null,
+          answers: answers && typeof answers === 'object' ? answers : null,
+          newsletter_opt_in: wantsNewsletter,
+          source: 'diagnostic-form-v1',
+        });
+      if (dbError) {
+        console.error('POST /api/diagnostic supabase error:', dbError);
+      }
+    } catch (e) {
+      console.error('POST /api/diagnostic supabase exception:', e);
+    }
+
+    // 2. メルマガ希望ならResend Audienceに追加。失敗してもメール送信は続行する
+    if (wantsNewsletter && RESEND_AUDIENCE_ID) {
+      try {
+        const resendForContact = new Resend(apiKey);
+        const [firstName, ...rest] = (typeof name === 'string' ? name.trim() : '').split(/\s+/);
+        await resendForContact.contacts.create({
+          email,
+          firstName: firstName || undefined,
+          lastName: rest.length ? rest.join(' ') : undefined,
+          unsubscribed: false,
+          audienceId: RESEND_AUDIENCE_ID,
+        });
+      } catch (e) {
+        console.error('POST /api/diagnostic resend audience error:', e);
+      }
+    }
+
+    // 3. 診断結果メールを送信
     const resend = new Resend(apiKey);
     const { error } = await resend.emails.send({
       from: FROM_EMAIL,
