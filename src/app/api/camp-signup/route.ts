@@ -70,10 +70,10 @@ function determinePricing(hasPair: boolean, signupDate: Date): {
     'standard': '定価',
   }[tier];
   const amount = {
-    'pair-early': 68000,
-    'early': 76500,
-    'pair': 76500,
-    'standard': 85000,
+    'pair-early': 60000,
+    'early': 67500,
+    'pair': 67500,
+    'standard': 75000,
   }[tier];
   const amountWithTax = Math.round(amount * 1.1);
   return { tier, tierLabel, amount, amountWithTax };
