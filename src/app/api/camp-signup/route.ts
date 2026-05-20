@@ -45,9 +45,9 @@ export async function OPTIONS(req: NextRequest) {
 
 /**
  * 価格判定:
- *   定価: 85,000円+税
- *   早割 or ペア割: 76,500円+税 (10% off)
- *   ペア早割: 68,000円+税 (20% off)
+ *   定価: 82,500円（税込／税抜75,000円）
+ *   早割 or ペア割: 74,250円（税込／税抜67,500円）(10% off)
+ *   ペア早割: 66,000円（税込／税抜60,000円）(20% off)
  */
 function determinePricing(hasPair: boolean, signupDate: Date): {
   tier: 'pair-early' | 'early' | 'pair' | 'standard';
@@ -370,7 +370,7 @@ function buildParticipantHtml(p: {
       </tr>
       <tr>
         <th align="left" style="padding:10px 12px;background:#f1f5f9;border:1px solid #e2e8f0;color:#475569;font-weight:600;">参加費</th>
-        <td style="padding:10px 12px;border:1px solid #e2e8f0;color:#1a1a2e;"><strong style="font-size:16px;">¥${amountFormatted}＋税</strong>（税込 ¥${amountWithTaxFormatted}）</td>
+        <td style="padding:10px 12px;border:1px solid #e2e8f0;color:#1a1a2e;"><strong style="font-size:16px;">¥${amountWithTaxFormatted}（税込）</strong><br><span style="font-size:12px;color:#5a5880;">税抜 ¥${amountFormatted}</span></td>
       </tr>
     </table>
 
@@ -450,7 +450,7 @@ function buildAdminHtml(p: {
       ${row('電話', p.phone)}
       ${row('部屋タイプ', p.roomTypeLabel)}
       ${row('ペア相手', p.pairPartnerName || '（一人での申込）')}
-      ${row('価格', `<strong>${p.pricing.tierLabel}：¥${p.pricing.amount.toLocaleString()}＋税（税込 ¥${p.pricing.amountWithTax.toLocaleString()}）</strong>`)}
+      ${row('価格', `<strong>${p.pricing.tierLabel}：¥${p.pricing.amountWithTax.toLocaleString()}（税込／税抜 ¥${p.pricing.amount.toLocaleString()}）</strong>`)}
       ${row('食事制限・アレルギー', escapeHtml(m.dietaryRestrictions || '（なし）'))}
       ${row('気をつけてほしいこと', escapeHtml(m.careNotes || '（なし）'))}
       ${row('緊急連絡先', m.emergencyContact?.name
