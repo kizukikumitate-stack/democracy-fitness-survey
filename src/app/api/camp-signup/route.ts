@@ -46,7 +46,7 @@ export async function OPTIONS(req: NextRequest) {
 /**
  * 価格判定（プログラム参加費。宿泊費は会場TAKIVIVAへ直接支払いのため含まない）:
  *   定価: 42,900円（税込／税抜39,000円）
- *   早割 or ペア割: 38,500円（税込／税抜35,000円）（▼¥4,000）
+ *   早割 or ペア割: 35,200円（税込／税抜32,000円）（▼¥7,000）
  *   ペア早割: 26,400円（税込／税抜24,000円）（▼¥15,000）
  */
 function determinePricing(hasPair: boolean, signupDate: Date): {
@@ -71,8 +71,8 @@ function determinePricing(hasPair: boolean, signupDate: Date): {
   }[tier];
   const amount = {
     'pair-early': 24000,
-    'early': 35000,
-    'pair': 35000,
+    'early': 32000,
+    'pair': 32000,
     'standard': 39000,
   }[tier];
   const amountWithTax = Math.round(amount * 1.1);
