@@ -44,10 +44,10 @@ export async function OPTIONS(req: NextRequest) {
 }
 
 /**
- * 価格判定:
- *   定価: 82,500円（税込／税抜75,000円）
- *   早割 or ペア割: 74,250円（税込／税抜67,500円）(10% off)
- *   ペア早割: 66,000円（税込／税抜60,000円）(20% off)
+ * 価格判定（プログラム参加費。宿泊費は会場TAKIVIVAへ直接支払いのため含まない）:
+ *   定価: 42,900円（税込／税抜39,000円）
+ *   早割 or ペア割: 38,500円（税込／税抜35,000円）（▼¥4,000）
+ *   ペア早割: 26,400円（税込／税抜24,000円）（▼¥15,000）
  */
 function determinePricing(hasPair: boolean, signupDate: Date): {
   tier: 'pair-early' | 'early' | 'pair' | 'standard';
@@ -64,16 +64,16 @@ function determinePricing(hasPair: boolean, signupDate: Date): {
         ? 'pair'
         : 'standard';
   const tierLabel = {
-    'pair-early': 'ペア早割（20%OFF）',
-    'early': '早割（10%OFF）',
-    'pair': 'ペア割（10%OFF）',
+    'pair-early': 'ペア早割',
+    'early': '早割',
+    'pair': 'ペア割',
     'standard': '定価',
   }[tier];
   const amount = {
-    'pair-early': 60000,
-    'early': 67500,
-    'pair': 67500,
-    'standard': 75000,
+    'pair-early': 24000,
+    'early': 35000,
+    'pair': 35000,
+    'standard': 39000,
   }[tier];
   const amountWithTax = Math.round(amount * 1.1);
   return { tier, tierLabel, amount, amountWithTax };
@@ -369,16 +369,16 @@ function buildParticipantHtml(p: {
         <td style="padding:10px 12px;border:1px solid #e2e8f0;color:#1a1a2e;">${escapeHtml(p.pricing.tierLabel)}</td>
       </tr>
       <tr>
-        <th align="left" style="padding:10px 12px;background:#f1f5f9;border:1px solid #e2e8f0;color:#475569;font-weight:600;">参加費</th>
-        <td style="padding:10px 12px;border:1px solid #e2e8f0;color:#1a1a2e;"><strong style="font-size:16px;">¥${amountWithTaxFormatted}（税込）</strong><br><span style="font-size:12px;color:#5a5880;">税抜 ¥${amountFormatted}</span></td>
+        <th align="left" style="padding:10px 12px;background:#f1f5f9;border:1px solid #e2e8f0;color:#475569;font-weight:600;">プログラム参加費</th>
+        <td style="padding:10px 12px;border:1px solid #e2e8f0;color:#1a1a2e;"><strong style="font-size:16px;">¥${amountWithTaxFormatted}（税込）</strong><br><span style="font-size:12px;color:#5a5880;">税抜 ¥${amountFormatted}　※宿泊費は別途</span></td>
       </tr>
     </table>
 
     <div style="background:#fef3e0;border-left:4px solid #e85d26;padding:18px 20px;margin:24px 0;border-radius:0 6px 6px 0;">
       <p style="margin:0 0 8px;font-size:13px;font-weight:700;color:#1a1a2e;">▼ お支払いについて</p>
       <p style="margin:0;font-size:13px;color:#475569;line-height:1.8;">
-        参加費のお振込先は、別途このメールアドレス宛にご案内いたします（数日以内）。<br>
-        振込手数料はご負担をお願いいたします。
+        <strong>プログラム参加費</strong>のお振込先は、別途このメールアドレス宛にご案内いたします（数日以内）。振込手数料はご負担をお願いいたします。<br><br>
+        <strong>宿泊費（1泊・全食事込み）は、会場TAKIVIVA様へ直接お支払い</strong>いただきます。ご予約の確定・お支払い方法（当日精算等）は、TAKIVIVA様より直接ご案内いたします。
       </p>
     </div>
 
