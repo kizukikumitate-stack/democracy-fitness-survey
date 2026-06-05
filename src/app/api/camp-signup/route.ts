@@ -378,7 +378,7 @@ function buildParticipantHtml(p: {
       <p style="margin:0 0 8px;font-size:13px;font-weight:700;color:#1a1a2e;">▼ お支払いについて</p>
       <p style="margin:0;font-size:13px;color:#475569;line-height:1.8;">
         <strong>プログラム参加費</strong>のお振込先は、別途このメールアドレス宛にご案内いたします（数日以内）。振込手数料はご負担をお願いいたします。<br><br>
-        <strong>宿泊費（1泊・全食事込み）は、会場TAKIVIVA様へ直接お支払い</strong>いただきます。ご予約の確定・お支払い方法（当日精算等）は、TAKIVIVA様より直接ご案内いたします。
+        <strong>宿泊費（1泊・全食事込み）は、当日、会場TAKIVIVA受付にて直接お支払い</strong>いただきます（現金・PayPay・クレジットカード等）。宿泊のご希望はこちらで取りまとめており、確定金額は当日精算時にご案内いたします。
       </p>
     </div>
 
