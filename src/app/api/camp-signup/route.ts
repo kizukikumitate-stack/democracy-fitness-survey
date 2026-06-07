@@ -15,6 +15,9 @@ const LP_URL = 'https://kizukikumitate.com/democracy-fitness-camp-0811.html';
 // 早割の締切（含む）
 const EARLY_BIRD_DEADLINE = '2026-06-30T23:59:59+09:00';
 
+// 個室の上限（室数）。この件数に達すると個室は選択不可になる
+const PRIVATE_CAPACITY = 4;
+
 const ALLOWED_ORIGINS = [
   'https://kizukikumitate.com',
   'https://kizukikumitate-stack.github.io',
@@ -30,7 +33,7 @@ function corsHeaders(origin: string | null): Record<string, string> {
   const allowed = origin && ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
   return {
     'Access-Control-Allow-Origin': allowed,
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type',
     Vary: 'Origin',
   };
@@ -77,6 +80,40 @@ function determinePricing(hasPair: boolean, signupDate: Date): {
   }[tier];
   const amountWithTax = Math.round(amount * 1.1);
   return { tier, tierLabel, amount, amountWithTax };
+}
+
+// 現在の個室申込件数を数える。取得できない場合は null（fail-open）
+async function countPrivateSignups(): Promise<number | null> {
+  try {
+    const admin = createSupabaseAdminClient();
+    const { count, error } = await admin
+      .from('event_signups')
+      .select('id', { count: 'exact', head: true })
+      .eq('event_id', EVENT_ID)
+      .eq('metadata->>roomType', 'private');
+    if (error) return null;
+    return count ?? 0;
+  } catch {
+    return null;
+  }
+}
+
+// 個室の空き状況（フォームが読み込み時に参照）
+export async function GET(req: NextRequest) {
+  const cors = corsHeaders(req.headers.get('origin'));
+  const count = await countPrivateSignups();
+  const privateCount = count ?? 0;
+  const privateRemaining = Math.max(0, PRIVATE_CAPACITY - privateCount);
+  return NextResponse.json(
+    {
+      privateCapacity: PRIVATE_CAPACITY,
+      privateCount,
+      privateRemaining,
+      // 件数を取得できなかった場合は満室扱いにしない（fail-open）
+      privateFull: count === null ? false : privateRemaining <= 0,
+    },
+    { headers: cors }
+  );
 }
 
 export async function POST(req: NextRequest) {
@@ -138,6 +175,17 @@ export async function POST(req: NextRequest) {
     const roomTypeLabel = roomType === 'rego' ? 'ReGo（個人スペース）' : '個室';
     const trimmedPairPartner = typeof pairPartnerName === 'string' ? pairPartnerName.trim() : '';
     const hasPair = trimmedPairPartner.length > 0;
+
+    // 個室の上限チェック（直接送信・同時申込対策のサーバー側ガード）
+    if (roomType === 'private') {
+      const privateCount = await countPrivateSignups();
+      if (privateCount !== null && privateCount >= PRIVATE_CAPACITY) {
+        return NextResponse.json(
+          { error: '申し訳ございません。個室は満室となりました。お手数ですが ReGo（個人スペース）をご選択ください。' },
+          { status: 409, headers: cors }
+        );
+      }
+    }
 
     const now = new Date();
     const pricing = determinePricing(hasPair, now);
