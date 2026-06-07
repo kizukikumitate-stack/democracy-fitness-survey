@@ -18,6 +18,9 @@ const EARLY_BIRD_DEADLINE = '2026-06-30T23:59:59+09:00';
 // 個室の上限（室数）。この件数に達すると個室は選択不可になる
 const PRIVATE_CAPACITY = 4;
 
+// 個室の受付を完全に締め切る（true の間は件数に関わらず個室を申し込めない）
+const PRIVATE_CLOSED = true;
+
 const ALLOWED_ORIGINS = [
   'https://kizukikumitate.com',
   'https://kizukikumitate-stack.github.io',
@@ -108,9 +111,10 @@ export async function GET(req: NextRequest) {
     {
       privateCapacity: PRIVATE_CAPACITY,
       privateCount,
-      privateRemaining,
-      // 件数を取得できなかった場合は満室扱いにしない（fail-open）
-      privateFull: count === null ? false : privateRemaining <= 0,
+      privateRemaining: PRIVATE_CLOSED ? 0 : privateRemaining,
+      privateClosed: PRIVATE_CLOSED,
+      // 受付締切中、または満室なら申込不可。件数取得不可時は満室扱いにしない（fail-open）
+      privateFull: PRIVATE_CLOSED ? true : (count === null ? false : privateRemaining <= 0),
     },
     { headers: cors }
   );
@@ -178,6 +182,12 @@ export async function POST(req: NextRequest) {
 
     // 個室の上限チェック（直接送信・同時申込対策のサーバー側ガード）
     if (roomType === 'private') {
+      if (PRIVATE_CLOSED) {
+        return NextResponse.json(
+          { error: '申し訳ございません。個室は満室のため受付を終了しました。お手数ですが ReGo（個人スペース）をご選択ください。' },
+          { status: 409, headers: cors }
+        );
+      }
       const privateCount = await countPrivateSignups();
       if (privateCount !== null && privateCount >= PRIVATE_CAPACITY) {
         return NextResponse.json(
