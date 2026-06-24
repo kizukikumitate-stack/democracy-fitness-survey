@@ -31,6 +31,11 @@ function formatDateTime(s: string): string {
     hour: '2-digit', minute: '2-digit',
   });
 }
+function groupsName(signups: Signup[], eventId: string): string {
+  if (eventId === 'all') return '';
+  const s = signups.find(x => (x.event_id ?? '') === eventId);
+  return s?.event_name ?? eventId;
+}
 
 export default function EventsDashboardPage() {
   const [keyInput, setKeyInput] = useState('');
@@ -41,6 +46,52 @@ export default function EventsDashboardPage() {
   const [error, setError] = useState('');
   const [filterEvent, setFilterEvent] = useState<string>('all');
   const [expanded, setExpanded] = useState<string | null>(null);
+
+  // リマインド送信
+  const [showReminder, setShowReminder] = useState(false);
+  const [reminderCount, setReminderCount] = useState<number | null>(null);
+  const [reminderTestEmail, setReminderTestEmail] = useState('');
+  const [reminderStatus, setReminderStatus] = useState('');
+  const [reminderBusy, setReminderBusy] = useState(false);
+
+  const callReminder = useCallback(async (mode: 'count' | 'test' | 'send') => {
+    if (!adminKey || filterEvent === 'all') return null;
+    setReminderBusy(true);
+    setReminderStatus(mode === 'count' ? '' : '送信中...');
+    try {
+      const res = await fetch('/api/event-reminder', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-admin-key': adminKey },
+        body: JSON.stringify({ event_id: filterEvent, mode, testEmail: reminderTestEmail.trim() || undefined }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setReminderStatus(`⚠️ ${data.message || data.error || `エラー（${res.status}）`}`);
+        return null;
+      }
+      if (mode === 'count') setReminderCount(data.recipientCount ?? 0);
+      if (mode === 'test') setReminderStatus(`✅ テスト送信しました（宛先: ${data.to}）`);
+      if (mode === 'send') setReminderStatus(`✅ 送信完了：${data.sent}名に送信（失敗 ${data.failed}）`);
+      return data;
+    } catch {
+      setReminderStatus('⚠️ 通信エラーが発生しました');
+      return null;
+    } finally {
+      setReminderBusy(false);
+    }
+  }, [adminKey, filterEvent, reminderTestEmail]);
+
+  const openReminder = useCallback(async () => {
+    setShowReminder(true);
+    setReminderStatus('');
+    setReminderCount(null);
+    await callReminder('count');
+  }, [callReminder]);
+
+  const currentEventName = useMemo(
+    () => groupsName(signups, filterEvent),
+    [signups, filterEvent],
+  );
 
   const load = useCallback(async (key: string) => {
     setLoading(true);
@@ -241,14 +292,86 @@ export default function EventsDashboardPage() {
               {g.event_name}（{g.count}）
             </button>
           ))}
-          <button
-            onClick={exportCsv}
-            disabled={filtered.length === 0}
-            className="ml-auto px-3 py-1.5 rounded-lg text-sm bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-40 transition"
-          >
-            CSVダウンロード（{filtered.length}件）
-          </button>
+          <div className="ml-auto flex items-center gap-2">
+            <button
+              onClick={openReminder}
+              disabled={filterEvent === 'all'}
+              title={filterEvent === 'all' ? 'イベントを1つ選んでください' : 'このイベントの申込者にリマインドを送る'}
+              className="px-3 py-1.5 rounded-lg text-sm bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-40 transition"
+            >
+              📧 リマインド送信
+            </button>
+            <button
+              onClick={exportCsv}
+              disabled={filtered.length === 0}
+              className="px-3 py-1.5 rounded-lg text-sm bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-40 transition"
+            >
+              CSVダウンロード（{filtered.length}件）
+            </button>
+          </div>
         </div>
+
+        {/* リマインド送信パネル */}
+        {showReminder && filterEvent !== 'all' && (
+          <div className="bg-white rounded-xl border border-indigo-200 shadow-sm p-5 mb-4">
+            <div className="flex items-start justify-between mb-3">
+              <div>
+                <h3 className="text-base font-semibold text-slate-800">リマインド送信</h3>
+                <p className="text-sm text-slate-500 mt-0.5">
+                  対象：<span className="font-medium text-slate-700">{currentEventName || filterEvent}</span>
+                  {reminderCount !== null && <>（<span className="font-semibold text-indigo-600">{reminderCount}名</span>）</>}
+                </p>
+              </div>
+              <button onClick={() => setShowReminder(false)} className="text-slate-400 hover:text-slate-700 text-sm">閉じる ✕</button>
+            </div>
+
+            <ol className="text-sm text-slate-600 space-y-3">
+              <li>
+                <span className="font-medium text-slate-700">① まずテスト送信して文面を確認</span>
+                <div className="flex flex-wrap items-center gap-2 mt-1.5">
+                  <input
+                    type="email"
+                    value={reminderTestEmail}
+                    onChange={e => setReminderTestEmail(e.target.value)}
+                    placeholder="テスト宛先（空欄なら y.morimoto@kizukikumitate.com）"
+                    className="flex-1 min-w-[18rem] px-3 py-2 border border-slate-300 rounded-lg text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                  <button
+                    onClick={() => callReminder('test')}
+                    disabled={reminderBusy}
+                    className="px-3 py-2 rounded-lg text-sm bg-slate-700 text-white hover:bg-slate-800 disabled:opacity-40 transition whitespace-nowrap"
+                  >
+                    テスト送信
+                  </button>
+                </div>
+              </li>
+              <li>
+                <span className="font-medium text-slate-700">② 問題なければ申込者全員へ送信</span>
+                <div className="mt-1.5">
+                  <button
+                    onClick={() => {
+                      const n = reminderCount ?? 0;
+                      if (window.confirm(`${currentEventName || filterEvent} の申込者 ${n}名 全員にリマインドメールを送信します。よろしいですか？`)) {
+                        callReminder('send');
+                      }
+                    }}
+                    disabled={reminderBusy || (reminderCount ?? 0) === 0}
+                    className="px-4 py-2 rounded-lg text-sm bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-40 transition"
+                  >
+                    全員に送信する（{reminderCount ?? 0}名）
+                  </button>
+                </div>
+              </li>
+            </ol>
+
+            {reminderStatus && (
+              <p className={`mt-3 text-sm ${reminderStatus.startsWith('✅') ? 'text-emerald-600' : 'text-red-500'}`}>{reminderStatus}</p>
+            )}
+            <p className="mt-3 text-xs text-slate-400">
+              送信元：きづきくみたて工房（noreply@kizukikumitate.com）／返信先：y.morimoto@kizukikumitate.com。同一メールアドレスの重複は自動で1通にまとめます。
+            </p>
+          </div>
+        )}
 
         {/* 一覧テーブル */}
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
