@@ -20,7 +20,7 @@ type ReminderTemplate = {
 // event_id ごとのリマインド本文。新イベントはここに追加するだけ。
 const TEMPLATES: Record<string, ReminderTemplate> = {
   'df-event-tokyo-2026-06': {
-    subject: '【明後日開催】デモクラシーフィットネス体験会 in 東京（第2回）当日のご案内＋お持ち物のお願い',
+    subject: '【明日開催】デモクラシーフィットネス体験会 in 東京（第2回）当日のご案内＋お持ち物のお願い',
     build: (name: string) => buildTokyoReminderHtml(name),
   },
 };
@@ -143,7 +143,7 @@ function buildTokyoReminderHtml(name: string): string {
 
   <tr><td style="background:#2d4a7a;border-radius:12px 12px 0 0;padding:28px 32px;">
     <p style="margin:0 0 4px;font-size:12px;color:#f0b429;letter-spacing:0.15em;">DEMOCRACY FITNESS TOKYO 2026</p>
-    <h1 style="margin:0;font-size:20px;font-weight:700;color:#ffffff;line-height:1.5;">いよいよ明後日です — 当日のご案内</h1>
+    <h1 style="margin:0;font-size:20px;font-weight:700;color:#ffffff;line-height:1.5;">いよいよ明日です — 当日のご案内</h1>
   </td></tr>
 
   <tr><td style="background:#ffffff;padding:28px 32px;">
@@ -151,7 +151,7 @@ function buildTokyoReminderHtml(name: string): string {
 
     <p style="margin:0 0 16px;font-size:14px;color:#475569;line-height:1.9;">
       いつもお世話になっております。きづきくみたて工房の森本です。<br>
-      いよいよ明後日となりました「デモクラシーフィットネス体験会 in 東京（第2回）」の当日のご案内をお送りします。当日お会いできるのを楽しみにしています。
+      いよいよ明日となりました「デモクラシーフィットネス体験会 in 東京（第2回）」の当日のご案内をお送りします。当日お会いできるのを楽しみにしています。
     </p>
 
     <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin:20px 0;font-size:13px;">
@@ -161,7 +161,7 @@ function buildTokyoReminderHtml(name: string): string {
       </tr>
       <tr>
         <th align="left" style="padding:10px 12px;background:#f1f5f9;border:1px solid #e2e8f0;color:#475569;font-weight:600;">会場</th>
-        <td style="padding:10px 12px;border:1px solid #e2e8f0;color:#1a1a2e;">国立オリンピック記念青少年総合センター（東京・代々木）<br><span style="font-size:12px;color:#5a5880;">東京都渋谷区代々木神園町3-1 ／ 建物・教室は当日入口の掲示にてご案内します</span></td>
+        <td style="padding:10px 12px;border:1px solid #e2e8f0;color:#1a1a2e;">国立オリンピック記念青少年総合センター（東京・代々木）<br><strong style="font-size:13px;">セ-404研修室</strong><br><span style="font-size:12px;color:#5a5880;">東京都渋谷区代々木神園町3-1</span></td>
       </tr>
       <tr>
         <th align="left" style="padding:10px 12px;background:#f1f5f9;border:1px solid #e2e8f0;color:#475569;font-weight:600;">参加費</th>
@@ -193,7 +193,7 @@ function buildTokyoReminderHtml(name: string): string {
 
     <p style="margin:18px 0 6px;font-size:14px;font-weight:700;color:#1a1a2e;">■ ご注意</p>
     <p style="margin:0 0 18px;font-size:13px;color:#475569;line-height:1.9;">
-      ご都合が悪くなった場合は、<strong>前日まで</strong>にこのメールへの返信でお知らせください（キャンセル料はかかりません）。当日、道に迷われたときや遅れそうなときも、このメールへの返信か下記までご連絡ください。
+      ご都合が悪くなってしまった場合は、<strong>わかった時点でお早めに</strong>このメールへの返信でお知らせください（キャンセル料はかかりません）。当日、道に迷われたときや遅れそうなときも、このメールへの返信か下記までご連絡ください。
     </p>
 
     <p style="margin:24px 0 0;font-size:14px;color:#475569;line-height:1.9;">
