@@ -296,10 +296,10 @@ export default function EventsDashboardPage() {
             <button
               onClick={openReminder}
               disabled={filterEvent === 'all'}
-              title={filterEvent === 'all' ? 'イベントを1つ選んでください' : 'このイベントの申込者にリマインドを送る'}
+              title={filterEvent === 'all' ? 'イベントを1つ選んでください' : 'このイベントの申込者に一斉メールを送る'}
               className="px-3 py-1.5 rounded-lg text-sm bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-40 transition"
             >
-              📧 リマインド送信
+              📧 一斉メール送信
             </button>
             <button
               onClick={exportCsv}
@@ -316,7 +316,7 @@ export default function EventsDashboardPage() {
           <div className="bg-white rounded-xl border border-indigo-200 shadow-sm p-5 mb-4">
             <div className="flex items-start justify-between mb-3">
               <div>
-                <h3 className="text-base font-semibold text-slate-800">リマインド送信</h3>
+                <h3 className="text-base font-semibold text-slate-800">一斉メール送信</h3>
                 <p className="text-sm text-slate-500 mt-0.5">
                   対象：<span className="font-medium text-slate-700">{currentEventName || filterEvent}</span>
                   {reminderCount !== null && <>（<span className="font-semibold text-indigo-600">{reminderCount}名</span>）</>}
@@ -351,7 +351,7 @@ export default function EventsDashboardPage() {
                   <button
                     onClick={() => {
                       const n = reminderCount ?? 0;
-                      if (window.confirm(`${currentEventName || filterEvent} の申込者 ${n}名 全員にリマインドメールを送信します。よろしいですか？`)) {
+                      if (window.confirm(`${currentEventName || filterEvent} の申込者 ${n}名 全員にメールを送信します。よろしいですか？`)) {
                         callReminder('send');
                       }
                     }}

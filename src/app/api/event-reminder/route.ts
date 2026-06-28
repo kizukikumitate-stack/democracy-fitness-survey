@@ -12,16 +12,24 @@ const FROM_EMAIL = process.env.RESEND_FROM_EMAIL ?? 'onboarding@resend.dev';
 const ADMIN_NOTIFY_EMAIL = process.env.RESEND_ADMIN_EMAIL ?? 'y.morimoto@kizukikumitate.com';
 const REPLY_TO = 'y.morimoto@kizukikumitate.com';
 
+// 合宿のお支払い期限（要確認・確定後に差し替え）
+const CAMP_PAYMENT_DEADLINE = '2026年7月10日（金）';
+
+type Recipient = { name: string; metadata: Record<string, unknown> | null };
 type ReminderTemplate = {
   subject: string;
-  build: (name: string) => string;
+  build: (r: Recipient) => string;
 };
 
-// event_id ごとのリマインド本文。新イベントはここに追加するだけ。
+// event_id ごとの送信本文。新イベント・新しい用途はここに追加するだけ。
 const TEMPLATES: Record<string, ReminderTemplate> = {
   'df-event-tokyo-2026-06': {
     subject: '【明日開催】デモクラシーフィットネス体験会 in 東京（第2回）当日のご案内＋お持ち物のお願い',
-    build: (name: string) => buildTokyoReminderHtml(name),
+    build: (r) => buildTokyoReminderHtml(r.name),
+  },
+  'df-camp-2026-08': {
+    subject: '【お支払いのご案内】デモクラシーフィットネス キャンプ2026 in 北軽井沢',
+    build: (r) => buildCampPaymentHtml(r.name, r.metadata),
   },
 };
 
@@ -48,13 +56,13 @@ export async function POST(req: NextRequest) {
   }
   const template = TEMPLATES[event_id];
 
-  // 申込者を取得（email で重複排除、最新の氏名を採用）
-  const recipients: { email: string; name: string }[] = [];
+  // 申込者を取得（email で重複排除、最新の申込内容を採用）
+  const recipients: { email: string; name: string; metadata: Record<string, unknown> | null }[] = [];
   try {
     const admin = createSupabaseAdminClient();
     const { data, error } = await admin
       .from('event_signups')
-      .select('email, name, created_at')
+      .select('email, name, created_at, metadata')
       .eq('event_id', event_id)
       .order('created_at', { ascending: false });
     if (error) {
@@ -66,7 +74,7 @@ export async function POST(req: NextRequest) {
       const email = (r.email ?? '').toLowerCase().trim();
       if (!email || seen.has(email)) continue;
       seen.add(email);
-      recipients.push({ email, name: (r.name ?? '').trim() });
+      recipients.push({ email, name: (r.name ?? '').trim(), metadata: (r.metadata ?? null) as Record<string, unknown> | null });
     }
   } catch (e) {
     console.error('POST /api/event-reminder admin client error:', e);
@@ -89,12 +97,17 @@ export async function POST(req: NextRequest) {
     const to = typeof testEmail === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(testEmail)
       ? testEmail.trim()
       : ADMIN_NOTIFY_EMAIL;
+    // テストでは申込者一覧の先頭の申込内容（あれば）で差し込みプレビュー
+    const sampleMeta = recipients[0]?.metadata
+      ?? (event_id === 'df-camp-2026-08'
+        ? { pricing: { tierLabel: '早割（10%OFF）', amount: 67500, amountWithTax: 74250 } }
+        : null);
     const { error } = await resend.emails.send({
       from: FROM_EMAIL,
       to,
       replyTo: REPLY_TO,
       subject: `[テスト送信] ${template.subject}`,
-      html: template.build('テスト 太郎'),
+      html: template.build({ name: 'テスト 太郎', metadata: sampleMeta }),
     });
     if (error) {
       console.error('POST /api/event-reminder test send error:', error);
@@ -116,7 +129,7 @@ export async function POST(req: NextRequest) {
       to: r.email,
       replyTo: REPLY_TO,
       subject: template.subject,
-      html: template.build(r.name || 'ご参加者'),
+      html: template.build({ name: r.name || 'ご参加者', metadata: r.metadata }),
     }));
     const { error } = await resend.batch.send(payload);
     if (error) {
@@ -199,6 +212,91 @@ function buildTokyoReminderHtml(name: string): string {
     <p style="margin:24px 0 0;font-size:14px;color:#475569;line-height:1.9;">
       それでは、当日お会いできるのを楽しみにしております。<br>
       ご不明な点がございましたら、お気軽にご返信ください。
+    </p>
+  </td></tr>
+
+  <tr><td style="background:#26215C;border-radius:0 0 12px 12px;padding:22px 32px;text-align:center;">
+    <p style="margin:0 0 4px;font-size:13px;font-weight:600;color:#ffffff;">きづきくみたて工房　森本 康仁</p>
+    <p style="margin:0;font-size:11px;color:rgba(255,255,255,0.7);">
+      <a href="mailto:y.morimoto@kizukikumitate.com" style="color:rgba(255,255,255,0.7);text-decoration:none;">y.morimoto@kizukikumitate.com</a> ／ 070-2810-2677
+    </p>
+  </td></tr>
+
+</table>
+</td></tr>
+</table>
+</body>
+</html>`;
+}
+
+// =============================================================
+// 北軽井沢合宿 お支払い案内
+// =============================================================
+function buildCampPaymentHtml(name: string, metadata: Record<string, unknown> | null): string {
+  const pricing = (metadata?.pricing ?? {}) as { tierLabel?: string; amount?: number; amountWithTax?: number };
+  const tierLabel = typeof pricing.tierLabel === 'string' ? pricing.tierLabel : 'お申込み内容に基づくプラン';
+  const amountRow = typeof pricing.amountWithTax === 'number'
+    ? `<strong style="font-size:18px;">¥${pricing.amountWithTax.toLocaleString()}（税込）</strong>${typeof pricing.amount === 'number' ? `<br><span style="font-size:12px;color:#5a5880;">税抜 ¥${pricing.amount.toLocaleString()}</span>` : ''}`
+    : `<span style="color:#5a5880;">お申込み内容をご確認のうえ、別途ご案内します。ご不明な場合はご返信ください。</span>`;
+
+  return `<!DOCTYPE html>
+<html lang="ja">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#f8f6ff;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Hiragino Sans',sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f8f6ff;padding:32px 16px;">
+<tr><td align="center">
+<table width="100%" cellpadding="0" cellspacing="0" style="max-width:620px;">
+
+  <tr><td style="background:#1c3329;border-radius:12px 12px 0 0;padding:28px 32px;">
+    <p style="margin:0 0 4px;font-size:12px;color:#f0b429;letter-spacing:0.15em;">DEMOCRACY FITNESS CAMP 2026</p>
+    <h1 style="margin:0;font-size:20px;font-weight:700;color:#ffffff;line-height:1.5;">参加費お支払いのご案内</h1>
+  </td></tr>
+
+  <tr><td style="background:#ffffff;padding:28px 32px;">
+    <p style="margin:0 0 18px;font-size:14px;color:#1a1a2e;">${escapeHtml(name)} 様</p>
+
+    <p style="margin:0 0 16px;font-size:14px;color:#475569;line-height:1.9;">
+      いつもお世話になっております。きづきくみたて工房の森本です。<br>
+      この度は「デモクラシーフィットネス キャンプ2026 in 北軽井沢」へお申込みいただき、誠にありがとうございます。お申込み時にご案内しておりました<strong>参加費のお振込先</strong>を、改めてご案内いたします。
+    </p>
+
+    <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin:20px 0;font-size:13px;">
+      <tr>
+        <th align="left" style="padding:10px 12px;background:#f1f5f9;border:1px solid #e2e8f0;width:34%;color:#475569;font-weight:600;">適用プラン</th>
+        <td style="padding:10px 12px;border:1px solid #e2e8f0;color:#1a1a2e;">${escapeHtml(tierLabel)}</td>
+      </tr>
+      <tr>
+        <th align="left" style="padding:10px 12px;background:#f1f5f9;border:1px solid #e2e8f0;color:#475569;font-weight:600;">参加費</th>
+        <td style="padding:10px 12px;border:1px solid #e2e8f0;color:#1a1a2e;">${amountRow}</td>
+      </tr>
+    </table>
+
+    <div style="background:#f0f7ff;border:1px solid #cfe0f5;padding:18px 20px;margin:20px 0;border-radius:8px;">
+      <p style="margin:0 0 10px;font-size:13px;font-weight:700;color:#1a1a2e;">▼ お振込先</p>
+      <table width="100%" cellpadding="0" cellspacing="0" style="font-size:13px;color:#1a1a2e;line-height:1.9;">
+        <tr><td style="padding:2px 0;width:38%;color:#5a5880;">金融機関</td><td style="padding:2px 0;">GMOあおぞらネット銀行（0310）</td></tr>
+        <tr><td style="padding:2px 0;color:#5a5880;">支店</td><td style="padding:2px 0;">法人第二営業部（102）</td></tr>
+        <tr><td style="padding:2px 0;color:#5a5880;">預金種別</td><td style="padding:2px 0;">普通預金</td></tr>
+        <tr><td style="padding:2px 0;color:#5a5880;">口座番号</td><td style="padding:2px 0;">2205882</td></tr>
+        <tr><td style="padding:2px 0;color:#5a5880;">口座名義</td><td style="padding:2px 0;">株式会社きづきくみたてワンダーラボ<br>（カ）キヅキクミタテワンダーラボ）</td></tr>
+      </table>
+    </div>
+
+    <div style="background:#fef3e0;border-left:4px solid #e85d26;padding:16px 20px;margin:20px 0;border-radius:0 6px 6px 0;">
+      <p style="margin:0;font-size:13px;color:#1a1a2e;line-height:1.8;">
+        <strong>お支払い期限：${CAMP_PAYMENT_DEADLINE}</strong><br>
+        <span style="color:#475569;">上記期限までにお振込をお願いいたします。振込手数料はお客様負担にてお願いいたします。</span>
+      </p>
+    </div>
+
+    <p style="margin:0 0 16px;font-size:13px;color:#475569;line-height:1.9;">
+      ※ペアでお申込みの場合も、原則お一人ずつ上記内容でお振込みください（おまとめをご希望の場合はご返信ください）。<br>
+      お振込が完了しましたら、お手数ですが本メールへのご返信にて「振込完了」とお知らせいただけますと確実です。
+    </p>
+
+    <p style="margin:24px 0 0;font-size:14px;color:#475569;line-height:1.9;">
+      合宿当日に向けた持ち物・アクセス・タイムスケジュール等の詳しいご案内は、開催が近くなりましたら改めてお送りします。<br>
+      ご不明な点がございましたら、お気軽にご返信ください。当日お会いできるのを楽しみにしております。
     </p>
   </td></tr>
 
