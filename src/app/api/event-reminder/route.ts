@@ -260,6 +260,12 @@ function buildCampPaymentHtml(name: string, metadata: Record<string, unknown> | 
       この度は「デモクラシーフィットネス キャンプ2026 in 北軽井沢」へお申込みいただき、誠にありがとうございます。お申込み時にご案内しておりました<strong>参加費のお振込先</strong>を、改めてご案内いたします。
     </p>
 
+    <div style="background:#eef7f0;border:1px solid #cde8d4;padding:16px 20px;margin:18px 0;border-radius:8px;">
+      <p style="margin:0;font-size:13px;color:#1a1a2e;line-height:1.85;">
+        🎉 このたび、最少催行人数（10名）に達し、<strong>無事に開催が確定</strong>いたしました。ご参加いただける皆さまに、心より感謝申し上げます。
+      </p>
+    </div>
+
     <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin:20px 0;font-size:13px;">
       <tr>
         <th align="left" style="padding:10px 12px;background:#f1f5f9;border:1px solid #e2e8f0;width:34%;color:#475569;font-weight:600;">適用プラン</th>
@@ -292,6 +298,16 @@ function buildCampPaymentHtml(name: string, metadata: Record<string, unknown> | 
     <p style="margin:0 0 16px;font-size:13px;color:#475569;line-height:1.9;">
       ※ペアでお申込みの場合も、原則お一人ずつ上記内容でお振込みください（おまとめをご希望の場合はご返信ください）。<br>
       お振込が完了しましたら、お手数ですが本メールへのご返信にて「振込完了」とお知らせいただけますと確実です。
+    </p>
+
+    <p style="margin:18px 0 6px;font-size:14px;font-weight:700;color:#1a1a2e;">■ 当日、会場でお支払いいただくもの</p>
+    <p style="margin:0 0 16px;font-size:13px;color:#475569;line-height:1.9;">
+      上記の参加費（事前お振込分）とは別に、<strong>食費・宿泊費・会場利用費等</strong>を当日、会場にてお支払いいただきます。最終的な金額は参加人数の確定後に確定いたしますが、ウェブサイトに記載のとおり<strong>最大で税込39,600円</strong>となります。確定しましたら、改めてお知らせいたします。
+    </p>
+
+    <p style="margin:18px 0 6px;font-size:14px;font-weight:700;color:#1a1a2e;">■ 軽井沢駅から会場までの交通について</p>
+    <p style="margin:0 0 16px;font-size:13px;color:#475569;line-height:1.9;">
+      上記に加えて、軽井沢駅から会場までの交通費が別途必要となります。現地でタクシー等に乗り合わせができるよう、参加者の皆さまの連絡用チャットグループを作成いたします（追ってご案内します）。
     </p>
 
     <p style="margin:24px 0 0;font-size:14px;color:#475569;line-height:1.9;">
