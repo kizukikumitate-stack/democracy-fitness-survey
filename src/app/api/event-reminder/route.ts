@@ -262,7 +262,7 @@ function buildCampPaymentHtml(name: string, metadata: Record<string, unknown> | 
 
     <div style="background:#eef7f0;border:1px solid #cde8d4;padding:16px 20px;margin:18px 0;border-radius:8px;">
       <p style="margin:0;font-size:13px;color:#1a1a2e;line-height:1.85;">
-        🎉 このたび、最少催行人数（10名）に達し、<strong>無事に開催が確定</strong>いたしました。ご参加いただける皆さまに、心より感謝申し上げます。
+        🎉 このたび、<strong>早割の段階で</strong>最少催行人数（10名）に達し、<strong>無事に開催が確定</strong>いたしました。ご参加いただける皆さまに、心より感謝申し上げます。
       </p>
     </div>
 
