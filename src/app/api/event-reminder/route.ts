@@ -296,8 +296,7 @@ function buildCampPaymentHtml(name: string, metadata: Record<string, unknown> | 
     </div>
 
     <p style="margin:0 0 16px;font-size:13px;color:#475569;line-height:1.9;">
-      ※ペアでお申込みの場合も、原則お一人ずつ上記内容でお振込みください（おまとめをご希望の場合はご返信ください）。<br>
-      お振込が完了しましたら、お手数ですが本メールへのご返信にて「振込完了」とお知らせいただけますと確実です。
+      ※ペアでお申込みの場合も、原則お一人ずつ上記内容でお振込みください（おまとめをご希望の場合はご返信ください）。
     </p>
 
     <p style="margin:18px 0 6px;font-size:14px;font-weight:700;color:#1a1a2e;">■ 当日、会場でお支払いいただくもの</p>
