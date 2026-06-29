@@ -256,7 +256,7 @@ function buildCampPaymentHtml(name: string, metadata: Record<string, unknown> | 
     <p style="margin:0 0 18px;font-size:14px;color:#1a1a2e;">${escapeHtml(name)} 様</p>
 
     <p style="margin:0 0 16px;font-size:14px;color:#475569;line-height:1.9;">
-      いつもお世話になっております。きづきくみたて工房の森本です。<br>
+      いつもお世話になっております。株式会社きづきくみたてワンダーラボの森本康仁です。<br>
       この度は「デモクラシーフィットネス キャンプ2026 in 北軽井沢」へお申込みいただき、誠にありがとうございます。お申込み時にご案内しておりました<strong>参加費のお振込先</strong>を、改めてご案内いたします。
     </p>
 
@@ -317,7 +317,7 @@ function buildCampPaymentHtml(name: string, metadata: Record<string, unknown> | 
   </td></tr>
 
   <tr><td style="background:#26215C;border-radius:0 0 12px 12px;padding:22px 32px;text-align:center;">
-    <p style="margin:0 0 4px;font-size:13px;font-weight:600;color:#ffffff;">きづきくみたて工房　森本 康仁</p>
+    <p style="margin:0 0 4px;font-size:13px;font-weight:600;color:#ffffff;">株式会社きづきくみたてワンダーラボ　森本 康仁</p>
     <p style="margin:0;font-size:11px;color:rgba(255,255,255,0.7);">
       <a href="mailto:y.morimoto@kizukikumitate.com" style="color:rgba(255,255,255,0.7);text-decoration:none;">y.morimoto@kizukikumitate.com</a> ／ 070-2810-2677
     </p>
