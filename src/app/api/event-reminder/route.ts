@@ -12,8 +12,8 @@ const FROM_EMAIL = process.env.RESEND_FROM_EMAIL ?? 'onboarding@resend.dev';
 const ADMIN_NOTIFY_EMAIL = process.env.RESEND_ADMIN_EMAIL ?? 'y.morimoto@kizukikumitate.com';
 const REPLY_TO = 'y.morimoto@kizukikumitate.com';
 
-// 合宿のお支払い期限（要確認・確定後に差し替え）
-const CAMP_PAYMENT_DEADLINE = '2026年7月10日（金）';
+// 合宿のお支払い期限（実施8/11の1週間前）
+const CAMP_PAYMENT_DEADLINE = '2026年8月4日（火）';
 
 type Recipient = { name: string; metadata: Record<string, unknown> | null };
 type ReminderTemplate = {
