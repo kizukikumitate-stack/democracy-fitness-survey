@@ -20,6 +20,8 @@ export default function AdminPage() {
   const [copiedToken, setCopiedToken] = useState<string | null>(null);
   const [copiedBlindToken, setCopiedBlindToken] = useState<string | null>(null);
   const [copiedBehaviorToken, setCopiedBehaviorToken] = useState<string | null>(null);
+  const [copiedStudentToken, setCopiedStudentToken] = useState<string | null>(null);
+  const [copiedStudentBehaviorToken, setCopiedStudentBehaviorToken] = useState<string | null>(null);
   const [editingToken, setEditingToken] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
 
@@ -118,6 +120,20 @@ export default function AdminPage() {
     await copyToClipboard(`${base}/survey/${token}?behavior=1`);
     setCopiedBehaviorToken(token);
     setTimeout(() => setCopiedBehaviorToken(null), 2000);
+  };
+
+  const handleCopyStudentLink = async (token: string) => {
+    const base = typeof window !== 'undefined' ? window.location.origin : '';
+    await copyToClipboard(`${base}/survey/${token}?edition=student`);
+    setCopiedStudentToken(token);
+    setTimeout(() => setCopiedStudentToken(null), 2000);
+  };
+
+  const handleCopyStudentBehaviorLink = async (token: string) => {
+    const base = typeof window !== 'undefined' ? window.location.origin : '';
+    await copyToClipboard(`${base}/survey/${token}?edition=student&behavior=1`);
+    setCopiedStudentBehaviorToken(token);
+    setTimeout(() => setCopiedStudentBehaviorToken(null), 2000);
   };
 
   const formatDate = (dateStr: string) => {
@@ -291,6 +307,46 @@ export default function AdminPage() {
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
                             行動実績
+                          </>
+                        )}
+                      </button>
+                      <button
+                        onClick={() => handleCopyStudentLink(survey.token)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-teal-300 text-teal-600 rounded-lg hover:bg-teal-50 transition"
+                      >
+                        {copiedStudentToken === survey.token ? (
+                          <>
+                            <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                            <span className="text-green-600">コピー済み</span>
+                          </>
+                        ) : (
+                          <>
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 14l9-5-9-5-9 5 9 5z M12 14l6.16-3.422A12.083 12.083 0 0121 15.417a11.955 11.955 0 01-9 2.583 11.955 11.955 0 01-9-2.583 12.083 12.083 0 01.84-4.84L12 14z" />
+                            </svg>
+                            学生版
+                          </>
+                        )}
+                      </button>
+                      <button
+                        onClick={() => handleCopyStudentBehaviorLink(survey.token)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-teal-300 text-teal-600 rounded-lg hover:bg-teal-50 transition"
+                      >
+                        {copiedStudentBehaviorToken === survey.token ? (
+                          <>
+                            <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                            <span className="text-green-600">コピー済み</span>
+                          </>
+                        ) : (
+                          <>
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            学生版・行動
                           </>
                         )}
                       </button>

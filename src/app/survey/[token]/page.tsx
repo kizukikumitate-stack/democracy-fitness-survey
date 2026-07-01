@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import Logo from '@/components/Logo';
-import { LAYER1_QUESTIONS, LAYER2_QUESTIONS, MUSCLES, Question, BEHAVIORAL_QUESTION_TEXTS } from '@/lib/questions';
+import { MUSCLES, Question, getQuestionSet, getBehavioralTexts, type Edition } from '@/lib/questions';
 
 type Answers = Record<string, number>;
 
@@ -21,16 +21,17 @@ function shuffle<T>(arr: T[]): T[] {
   return a;
 }
 
-function QuestionCard({ question, value, onChange, index, blind, behavior }: {
+function QuestionCard({ question, value, onChange, index, blind, behavior, behavioralTexts }: {
   question: Question;
   value: number | undefined;
   onChange: (id: string, score: number) => void;
   index: number;
   blind: boolean;
   behavior: boolean;
+  behavioralTexts: Record<string, string>;
 }) {
   const SCORE_LABELS = behavior ? SCORE_LABELS_BEHAVIOR : SCORE_LABELS_ATTITUDE;
-  const questionText = behavior ? (BEHAVIORAL_QUESTION_TEXTS[question.id] ?? question.text) : question.text;
+  const questionText = behavior ? (behavioralTexts[question.id] ?? question.text) : question.text;
   const muscle = MUSCLES[question.muscleIndex];
   const muscleColors = [
     'bg-blue-100 text-blue-700',
@@ -118,8 +119,17 @@ export default function SurveyPage() {
   const token = params.token as string;
   const blind = searchParams.get('blind') === '1';
   const behavior = searchParams.get('behavior') === '1';
+  const edition: Edition = searchParams.get('edition') === 'student' ? 'student' : 'business';
+  const isStudent = edition === 'student';
 
-  const DRAFT_KEY = `survey_draft_${token}`;
+  const questionSet = useMemo(() => getQuestionSet(edition), [edition]);
+  const layer1Questions = useMemo(() => questionSet.filter(q => q.layer === 1), [questionSet]);
+  const layer2Questions = useMemo(() => questionSet.filter(q => q.layer === 2), [questionSet]);
+  const behavioralTexts = useMemo(() => getBehavioralTexts(edition), [edition]);
+  // Part 2 のラベル（学生版は「環境」、法人版は「組織」）
+  const envLabel = isStudent ? '環境評価' : '組織評価';
+
+  const DRAFT_KEY = `survey_draft_${edition}_${token}`;
 
   const [pageState, setPageState] = useState<PageState>('loading');
   const [organizationName, setOrganizationName] = useState('');
@@ -130,8 +140,8 @@ export default function SurveyPage() {
   const [draftRestored, setDraftRestored] = useState(false);
 
   // Shuffle questions every session (both normal and blind mode)
-  const shuffledPart1 = useMemo(() => shuffle(LAYER1_QUESTIONS), []);
-  const shuffledPart2 = useMemo(() => shuffle(LAYER2_QUESTIONS), []);
+  const shuffledPart1 = useMemo(() => shuffle(layer1Questions), [layer1Questions]);
+  const shuffledPart2 = useMemo(() => shuffle(layer2Questions), [layer2Questions]);
 
   useEffect(() => {
     const fetchSurvey = async () => {
@@ -182,11 +192,11 @@ export default function SurveyPage() {
     setAnswers(prev => ({ ...prev, [id]: score }));
   };
 
-  const part1Answered = LAYER1_QUESTIONS.every(q => answers[q.id] !== undefined);
-  const part2Answered = LAYER2_QUESTIONS.every(q => answers[q.id] !== undefined);
+  const part1Answered = layer1Questions.every(q => answers[q.id] !== undefined);
+  const part2Answered = layer2Questions.every(q => answers[q.id] !== undefined);
 
-  const part1AnsweredCount = LAYER1_QUESTIONS.filter(q => answers[q.id] !== undefined).length;
-  const part2AnsweredCount = LAYER2_QUESTIONS.filter(q => answers[q.id] !== undefined).length;
+  const part1AnsweredCount = layer1Questions.filter(q => answers[q.id] !== undefined).length;
+  const part2AnsweredCount = layer2Questions.filter(q => answers[q.id] !== undefined).length;
 
   const handleSubmit = async () => {
     setPageState('submitting');
@@ -200,6 +210,7 @@ export default function SurveyPage() {
           respondentDate: respondentDate || '',
           answers,
           surveyType: behavior ? 'behavior' : 'attitude',
+          edition,
         }),
       });
       if (res.ok) {
@@ -280,7 +291,7 @@ export default function SurveyPage() {
             </div>
           )}
           <button
-            onClick={() => setPageState(Object.keys(answers).some(id => LAYER2_QUESTIONS.find(q => q.id === id)) ? 'part2' : 'part1')}
+            onClick={() => setPageState(Object.keys(answers).some(id => layer2Questions.find(q => q.id === id)) ? 'part2' : 'part1')}
             className="w-full px-4 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition"
           >
             {answeredCount > 0 ? '続きから回答する' : '最初から回答する'}
@@ -307,7 +318,7 @@ export default function SurveyPage() {
             <div className="text-right">
               <p className="text-sm font-medium text-slate-700">{organizationName}</p>
               <p className="text-xs text-slate-400">
-                {isPartOne ? 'Part 1: 個人評価' : 'Part 2: 組織評価'}
+                {isPartOne ? 'Part 1: 個人評価' : `Part 2: ${envLabel}`}
               </p>
             </div>
           </div>
@@ -329,7 +340,7 @@ export default function SurveyPage() {
               Part 1 個人評価
             </span>
             <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${!isPartOne ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-500'}`}>
-              Part 2 組織評価
+              Part 2 {envLabel}
             </span>
           </div>
         </div>
@@ -385,16 +396,24 @@ export default function SurveyPage() {
         {/* Part description */}
         <div className={`rounded-xl p-5 mb-6 border ${isPartOne ? 'bg-blue-50 border-blue-100' : 'bg-green-50 border-green-100'}`}>
           <h1 className={`text-lg font-bold mb-1 ${isPartOne ? 'text-blue-800' : 'text-green-800'}`}>
-            {isPartOne ? 'Part 1: 個人評価（30問）' : 'Part 2: 組織評価（30問）'}
+            {isPartOne ? `Part 1: 個人評価（${layer1Questions.length}問）` : `Part 2: ${envLabel}（${layer2Questions.length}問）`}
           </h1>
           <p className={`text-sm ${isPartOne ? 'text-blue-700' : 'text-green-700'}`}>
-            {behavior
-              ? (isPartOne
-                  ? 'この半年で、自分が実際に行動したことを振り返りながら回答してください。'
-                  : 'この半年で、組織・チームの中で実際に起きたことを振り返りながら回答してください。')
-              : (isPartOne
-                  ? '自分自身の対話力について、日頃の行動を振り返りながら回答してください。'
-                  : 'あなたの組織・チームの状況について、実態を踏まえて回答してください。')
+            {isStudent
+              ? (behavior
+                  ? (isPartOne
+                      ? 'この半年で、自分が実際にやったことを振り返りながら回答してください。'
+                      : 'この半年で、あなたがよく参加する場（ゼミ・授業・サークル・バイト先など）で実際に起きたことを振り返って回答してください。')
+                  : (isPartOne
+                      ? '自分自身の対話のクセについて、日頃を振り返りながら回答してください。'
+                      : 'あなたがよく参加する場（ゼミ・授業・サークル・バイト先など）を一つ思い浮かべ、その場の状況について回答してください。'))
+              : (behavior
+                  ? (isPartOne
+                      ? 'この半年で、自分が実際に行動したことを振り返りながら回答してください。'
+                      : 'この半年で、組織・チームの中で実際に起きたことを振り返りながら回答してください。')
+                  : (isPartOne
+                      ? '自分自身の対話力について、日頃の行動を振り返りながら回答してください。'
+                      : 'あなたの組織・チームの状況について、実態を踏まえて回答してください。'))
             }
           </p>
         </div>
@@ -471,6 +490,7 @@ export default function SurveyPage() {
                 index={i}
                 blind={true}
                 behavior={behavior}
+                behavioralTexts={behavioralTexts}
               />
             ))}
           </div>
@@ -497,6 +517,7 @@ export default function SurveyPage() {
                         index={globalIndex}
                         blind={false}
                         behavior={behavior}
+                        behavioralTexts={behavioralTexts}
                       />
                     );
                   })}
@@ -515,7 +536,7 @@ export default function SurveyPage() {
                   <p className="text-sm font-medium text-slate-700">
                     {part1Answered ? 'Part 1 完了！' : `残り ${totalQuestions - currentAnsweredCount} 問`}
                   </p>
-                  <p className="text-xs text-slate-400">次へ進むと組織評価になります</p>
+                  <p className="text-xs text-slate-400">次へ進むと{envLabel}になります</p>
                 </div>
                 <button
                   onClick={() => { setPageState('part2'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
-import { QUESTIONS, MUSCLES, transformScore } from '@/lib/questions';
+import { QUESTIONS, MUSCLES, transformScore, getQuestionSet, type Edition } from '@/lib/questions';
 import { sendResultEmail } from '@/lib/sendResultEmail';
 
 export async function POST(
@@ -19,13 +19,14 @@ export async function POST(
     }
 
     const body = await req.json();
-    const { respondentName, respondentEmail, answers, surveyType } = body;
+    const { respondentName, respondentEmail, answers, surveyType, edition } = body;
 
     if (!answers || typeof answers !== 'object') {
       return NextResponse.json({ error: 'answers は必須です' }, { status: 400 });
     }
 
-    const missingQuestions = QUESTIONS.filter(q => {
+    const questionSet = getQuestionSet(edition === 'student' ? 'student' : 'business');
+    const missingQuestions = questionSet.filter(q => {
       const val = answers[q.id];
       return val === undefined || val === null || val < 1 || val > 5;
     });
@@ -84,12 +85,15 @@ export async function POST(
           avgScores = MUSCLES.map(muscle => {
             const l1 = QUESTIONS.filter(q => q.muscleIndex === muscle.index && q.layer === 1);
             const l2 = QUESTIONS.filter(q => q.muscleIndex === muscle.index && q.layer === 2);
-            const indVals = allResponses.map(r =>
-              l1.map(q => transformScore(r.answers[q.id] ?? 3, q.reversed)).reduce((s, v) => s + v, 0) / l1.length
-            );
-            const orgVals = allResponses.map(r =>
-              l2.map(q => transformScore(r.answers[q.id] ?? 3, q.reversed)).reduce((s, v) => s + v, 0) / l2.length
-            );
+            // 学生版(40問)は各筋のIDの一部のみ回答されるため、回答が存在する設問だけで平均する
+            // （60問版は全設問回答済みなので結果は変わらない）
+            const layerAvg = (answers: Record<string, number>, qs: typeof l1) => {
+              const present = qs.filter(q => answers[q.id] != null);
+              const base = present.length > 0 ? present : qs;
+              return base.map(q => transformScore(answers[q.id] ?? 3, q.reversed)).reduce((s, v) => s + v, 0) / base.length;
+            };
+            const indVals = allResponses.map(r => layerAvg(r.answers, l1));
+            const orgVals = allResponses.map(r => layerAvg(r.answers, l2));
             return {
               muscleIndex: muscle.index,
               muscleName: muscle.name,

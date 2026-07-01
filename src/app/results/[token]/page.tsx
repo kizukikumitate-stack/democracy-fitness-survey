@@ -4,9 +4,10 @@ import ResultsClient from './ResultsClient';
 
 interface Props {
   params: { token: string };
+  searchParams: { edition?: string };
 }
 
-export default async function ResultsPage({ params }: Props) {
+export default async function ResultsPage({ params, searchParams }: Props) {
   const { data: survey, error } = await supabase
     .from('surveys')
     .select('*')
@@ -17,5 +18,11 @@ export default async function ResultsPage({ params }: Props) {
     notFound();
   }
 
-  return <ResultsClient token={params.token} organizationName={survey.organization_name} />;
+  return (
+    <ResultsClient
+      token={params.token}
+      organizationName={survey.organization_name}
+      isStudent={searchParams?.edition === 'student'}
+    />
+  );
 }

@@ -2,7 +2,8 @@ import { Resend } from 'resend';
 import { MUSCLES, QUESTIONS, transformScore } from './questions';
 import { generateResultPdfBuffer } from './generateResultPdf';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Resend はメール送信時にのみ生成する（トップレベルで生成すると、APIキー未設定の
+// 環境ではモジュール読込時点で例外になり、メール不要のリクエストまで巻き添えで落ちるため）
 const FROM_EMAIL = process.env.RESEND_FROM_EMAIL ?? 'onboarding@resend.dev';
 
 interface MuscleScore {
@@ -147,11 +148,16 @@ export async function computeScoresFromAnswers(answers: Record<string, number>):
     const layer1Questions = QUESTIONS.filter(q => q.muscleIndex === muscle.index && q.layer === 1);
     const layer2Questions = QUESTIONS.filter(q => q.muscleIndex === muscle.index && q.layer === 2);
 
-    const indScores = layer1Questions.map(q => transformScore(answers[q.id] ?? 3, q.reversed));
-    const individual = indScores.reduce((s, v) => s + v, 0) / indScores.length;
+    // 学生版(40問)は各筋のIDの一部のみ回答されるため、回答が存在する設問だけで平均する
+    // （60問版は全設問回答済みなので結果は変わらない）
+    const layerAvg = (qs: typeof layer1Questions) => {
+      const present = qs.filter(q => answers[q.id] != null);
+      const base = present.length > 0 ? present : qs;
+      return base.map(q => transformScore(answers[q.id] ?? 3, q.reversed)).reduce((s, v) => s + v, 0) / base.length;
+    };
 
-    const orgScores = layer2Questions.map(q => transformScore(answers[q.id] ?? 3, q.reversed));
-    const organization = orgScores.reduce((s, v) => s + v, 0) / orgScores.length;
+    const individual = layerAvg(layer1Questions);
+    const organization = layerAvg(layer2Questions);
 
     return { muscleIndex: muscle.index, muscleName: muscle.name, individual, organization };
   });
@@ -192,6 +198,7 @@ export async function sendResultEmail({
     ? [{ filename: `${organizationName}_診断結果.pdf`, content: pdfBuffer }]
     : [];
 
+  const resend = new Resend(process.env.RESEND_API_KEY);
   const { error } = await resend.emails.send({
     from: FROM_EMAIL,
     to,

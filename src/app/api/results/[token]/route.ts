@@ -51,22 +51,18 @@ export async function GET(
       const layer1Questions = QUESTIONS.filter(q => q.muscleIndex === muscle.index && q.layer === 1);
       const layer2Questions = QUESTIONS.filter(q => q.muscleIndex === muscle.index && q.layer === 2);
 
-      const individualScores = responses.map(response => {
-        const questionScores = layer1Questions.map(q => {
-          const raw = response.answers[q.id] ?? 3;
-          return transformScore(raw, q.reversed);
-        });
-        return questionScores.reduce((sum, s) => sum + s, 0) / questionScores.length;
-      });
+      // 学生版(40問)は各筋のIDの一部のみ回答されるため、回答が存在する設問だけで平均する
+      // （60問版は全設問回答済みなので結果は変わらない）
+      const layerAvg = (answers: Record<string, number>, qs: typeof layer1Questions) => {
+        const present = qs.filter(q => answers[q.id] != null);
+        const base = present.length > 0 ? present : qs;
+        return base.map(q => transformScore(answers[q.id] ?? 3, q.reversed)).reduce((s, v) => s + v, 0) / base.length;
+      };
+
+      const individualScores = responses.map(response => layerAvg(response.answers, layer1Questions));
       const individual = individualScores.reduce((sum, s) => sum + s, 0) / individualScores.length;
 
-      const organizationScores = responses.map(response => {
-        const questionScores = layer2Questions.map(q => {
-          const raw = response.answers[q.id] ?? 3;
-          return transformScore(raw, q.reversed);
-        });
-        return questionScores.reduce((sum, s) => sum + s, 0) / questionScores.length;
-      });
+      const organizationScores = responses.map(response => layerAvg(response.answers, layer2Questions));
       const organization = organizationScores.reduce((sum, s) => sum + s, 0) / organizationScores.length;
 
       return {

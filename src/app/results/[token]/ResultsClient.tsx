@@ -39,6 +39,7 @@ interface IndividualResult {
 interface Props {
   token: string;
   organizationName: string;
+  isStudent?: boolean;
 }
 
 type SurveyTypeFilter = 'all' | 'attitude' | 'behavior';
@@ -93,7 +94,7 @@ function DiffBadge({ diff }: { diff: number }) {
   );
 }
 
-function ScoreTable({ scores, avgScores }: { scores: MuscleScore[]; avgScores?: MuscleScore[] }) {
+function ScoreTable({ scores, avgScores, env = '組織' }: { scores: MuscleScore[]; avgScores?: MuscleScore[]; env?: string }) {
   const avgMap = avgScores ? new Map(avgScores.map(s => [s.muscleIndex, s])) : null;
   return (
     <div className="overflow-x-auto">
@@ -105,7 +106,7 @@ function ScoreTable({ scores, avgScores }: { scores: MuscleScore[]; avgScores?: 
               {avgMap ? '個人（本人 / 平均）' : '個人'}
             </th>
             <th className="text-center px-4 py-3 text-xs font-medium text-green-600 uppercase tracking-wider">
-              {avgMap ? '組織（本人 / 平均）' : '組織'}
+              {avgMap ? `${env}（本人 / 平均）` : env}
             </th>
             <th className="text-center px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">診断</th>
           </tr>
@@ -186,7 +187,7 @@ const FEEDBACK_STYLES: Record<FeedbackType, { label: string; labelColor: string;
   ind_gap:   { label: '実践ギャップ', labelColor: 'bg-cyan-600 text-white',  border: 'border-cyan-200',  bg: 'bg-cyan-50',   text: 'text-cyan-900' },
 };
 
-function generateFeedback(personScores: MuscleScore[], avgScores?: MuscleScore[]): FeedbackGroup[] {
+function generateFeedback(personScores: MuscleScore[], avgScores?: MuscleScore[], env = '組織'): FeedbackGroup[] {
   const ownAvgInd = personScores.reduce((s, sc) => s + sc.individual, 0) / personScores.length;
 
   // ---- 個人内比較（他の筋肉と比べて） ----
@@ -223,12 +224,12 @@ function generateFeedback(personScores: MuscleScore[], avgScores?: MuscleScore[]
       if (gap >= 0.8) {
         gapItems.push({
           type: 'org_gap',
-          message: `「${s.muscleName}」は個人スコア（${s.individual.toFixed(2)}）に比べて組織スコア（${s.organization.toFixed(2)}）が低い状態です。あなたの力が発揮しやすい環境づくりを周囲と働きかけてみましょう。`,
+          message: `「${s.muscleName}」は個人スコア（${s.individual.toFixed(2)}）に比べて${env}スコア（${s.organization.toFixed(2)}）が低い状態です。あなたの力が発揮しやすい環境づくりを周囲と働きかけてみましょう。`,
         });
       } else if (gap <= -0.8) {
         gapItems.push({
           type: 'ind_gap',
-          message: `「${s.muscleName}」は組織スコア（${s.organization.toFixed(2)}）に比べて個人スコア（${s.individual.toFixed(2)}）が低い状態です。環境は整っているので、個人的な実践を増やすことで大きく伸びる可能性があります。`,
+          message: `「${s.muscleName}」は${env}スコア（${s.organization.toFixed(2)}）に比べて個人スコア（${s.individual.toFixed(2)}）が低い状態です。環境は整っているので、個人的な実践を増やすことで大きく伸びる可能性があります。`,
         });
       }
     });
@@ -273,13 +274,13 @@ function generateFeedback(personScores: MuscleScore[], avgScores?: MuscleScore[]
     groups.push({ title: '全体平均との比較', items: avgItems });
   }
   if (gapItems.length > 0) {
-    groups.push({ title: '個人と組織のギャップ', items: gapItems });
+    groups.push({ title: `個人と${env}のギャップ`, items: gapItems });
   }
   return groups;
 }
 
-function FeedbackSection({ scores, avgScores }: { scores: MuscleScore[]; avgScores?: MuscleScore[] }) {
-  const groups = generateFeedback(scores, avgScores);
+function FeedbackSection({ scores, avgScores, env = '組織' }: { scores: MuscleScore[]; avgScores?: MuscleScore[]; env?: string }) {
+  const groups = generateFeedback(scores, avgScores, env);
   if (groups.length === 0) return null;
 
   return (
@@ -321,8 +322,10 @@ interface SummaryParagraph {
 function generateGroupSummary(
   scores: MuscleScore[],
   responseCount: number,
-  surveyTypeLabel: string
+  surveyTypeLabel: string,
+  env = '組織'
 ): SummaryParagraph[] {
+  const isStudent = env !== '組織';
   const paragraphs: SummaryParagraph[] = [];
 
   const avgInd = scores.reduce((s, sc) => s + sc.individual, 0) / scores.length;
@@ -332,22 +335,26 @@ function generateGroupSummary(
   // 総合評価
   let levelText = '';
   if (avgInd >= 3.8 && avgOrg >= 3.8) {
-    levelText = '個人・組織ともに非常に高い対話力を発揮しています。';
+    levelText = `個人・${env}ともに非常に高い対話力を発揮しています。`;
   } else if (avgInd >= 3.5 && avgOrg >= 3.5) {
-    levelText = '個人・組織ともに良好な対話力が発揮されています。';
+    levelText = `個人・${env}ともに良好な対話力が発揮されています。`;
   } else if (avgInd >= 3.0 && avgOrg >= 3.0) {
     levelText = '全体的に標準的な水準を保ちつつも、さらなる成長の余地があります。';
   } else if (avgInd < 3.0 && avgOrg < 3.0) {
-    levelText = '個人・組織ともに対話力の強化が重要な課題となっています。';
+    levelText = `個人・${env}ともに対話力の強化が重要な課題となっています。`;
   } else if (avgInd >= 3.0 && avgOrg < 3.0) {
-    levelText = '個人の対話意識は高いものの、それを活かせる組織環境の整備が課題です。';
+    levelText = isStudent
+      ? 'メンバー個人の対話意識は高いものの、それを活かせる環境づくりが課題です。'
+      : '個人の対話意識は高いものの、それを活かせる組織環境の整備が課題です。';
   } else {
-    levelText = '組織環境は比較的整っているものの、個人レベルの対話実践の定着が課題です。';
+    levelText = isStudent
+      ? '環境は比較的整っているものの、個人レベルの対話実践の定着が課題です。'
+      : '組織環境は比較的整っているものの、個人レベルの対話実践の定着が課題です。';
   }
 
   paragraphs.push({
     heading: '総合評価',
-    body: `${surveyTypeLabel}の${responseCount}名の回答を集計した結果、個人スコア平均 ${avgInd.toFixed(2)}、組織スコア平均 ${avgOrg.toFixed(2)} となりました。${levelText}`,
+    body: `${surveyTypeLabel}の${responseCount}名の回答を集計した結果、個人スコア平均 ${avgInd.toFixed(2)}、${env}スコア平均 ${avgOrg.toFixed(2)} となりました。${levelText}`,
   });
 
   // 強みの筋肉（上位3）
@@ -376,22 +383,24 @@ function generateGroupSummary(
 
   let patternBody = '';
   if (dominant[0] === 'both_high') {
-    patternBody = `10筋肉のうち${dominant[1]}個が「発揮できている」（個人・組織ともに高い）象限に位置しており、強みの発揮と組織文化の両立が実現できています。この強みを維持しながら、残りの領域への波及を図ることが次のステップです。`;
+    patternBody = `10筋肉のうち${dominant[1]}個が「発揮できている」（個人・${env}ともに高い）象限に位置しており、強みの発揮と${isStudent ? '場の雰囲気' : '組織文化'}の両立が実現できています。この強みを維持しながら、残りの領域への波及を図ることが次のステップです。`;
   } else if (dominant[0] === 'org_low') {
-    patternBody = `${dominant[1]}個の筋肉が「環境が阻害中」（個人は高いが組織が低い）象限に位置しています。メンバーの意識・能力はあるものの、それを活かせる場や文化が不足している状態です。心理的安全性の向上や対話の仕組みづくりが効果的なアプローチになるでしょう。`;
+    patternBody = `${dominant[1]}個の筋肉が「環境が阻害中」（個人は高いが${env}が低い）象限に位置しています。メンバーの意識・能力はあるものの、それを活かせる場や${isStudent ? '雰囲気' : '文化'}が不足している状態です。心理的安全性の向上や対話の仕組みづくりが効果的なアプローチになるでしょう。`;
   } else if (dominant[0] === 'individual_low') {
-    patternBody = `${dominant[1]}個の筋肉が「個人が課題」（組織は高いが個人が低い）象限に位置しています。環境や文化は比較的整っているものの、個人レベルでの実践や行動変容が追いついていない状態です。個別コーチングや実践の場の提供が効果的です。`;
+    patternBody = `${dominant[1]}個の筋肉が「個人が課題」（${env}は高いが個人が低い）象限に位置しています。環境や${isStudent ? '雰囲気' : '文化'}は比較的整っているものの、個人レベルでの実践や行動変容が追いついていない状態です。${isStudent ? '個別のふりかえり' : '個別コーチング'}や実践の場の提供が効果的です。`;
   } else {
-    patternBody = `${dominant[1]}個の筋肉が「両方に課題」（個人・組織ともに低い）象限に位置しており、個人・組織の両面での包括的な対話力強化が最優先課題といえます。まずは安心して意見を言える場づくりから始めることを推奨します。`;
+    patternBody = `${dominant[1]}個の筋肉が「両方に課題」（個人・${env}ともに低い）象限に位置しており、個人・${env}の両面での包括的な対話力強化が最優先課題といえます。まずは安心して意見を言える場づくりから始めることを推奨します。`;
   }
   paragraphs.push({ heading: '象限パターンの傾向', body: patternBody });
 
   // 個人と組織のギャップ傾向
   if (Math.abs(overallGap) >= 0.25) {
     const gapBody = overallGap > 0
-      ? `全体として個人スコアが組織スコアを平均 ${overallGap.toFixed(2)} 上回っています。「意識・意欲はあるが、組織の場や環境が対話を後押ししていない」という構造的な課題が示唆されます。制度・文化・会議体の見直しが効果的です。`
-      : `全体として組織スコアが個人スコアを平均 ${Math.abs(overallGap).toFixed(2)} 上回っています。「環境や文化は整っているが、個人の実践が追いついていない」状態です。スキルトレーニングや実践機会の提供が効果的なアプローチになるでしょう。`;
-    paragraphs.push({ heading: '個人と組織の乖離', body: gapBody });
+      ? (isStudent
+          ? `全体として個人スコアが${env}スコアを平均 ${overallGap.toFixed(2)} 上回っています。「意識・意欲はあるが、場や環境が対話を後押ししていない」という構造的な課題が示唆されます。場のルールや雰囲気の見直しが効果的です。`
+          : `全体として個人スコアが${env}スコアを平均 ${overallGap.toFixed(2)} 上回っています。「意識・意欲はあるが、組織の場や環境が対話を後押ししていない」という構造的な課題が示唆されます。制度・文化・会議体の見直しが効果的です。`)
+      : `全体として${env}スコアが個人スコアを平均 ${Math.abs(overallGap).toFixed(2)} 上回っています。「環境や${isStudent ? '雰囲気' : '文化'}は整っているが、個人の実践が追いついていない」状態です。スキルトレーニングや実践機会の提供が効果的なアプローチになるでしょう。`;
+    paragraphs.push({ heading: `個人と${env}の乖離`, body: gapBody });
   }
 
   return paragraphs;
@@ -401,13 +410,15 @@ function GroupSummarySection({
   scores,
   responseCount,
   surveyTypeLabel,
+  env = '組織',
 }: {
   scores: MuscleScore[];
   responseCount: number;
   surveyTypeLabel: string;
+  env?: string;
 }) {
   const [open, setOpen] = useState(true);
-  const paragraphs = generateGroupSummary(scores, responseCount, surveyTypeLabel);
+  const paragraphs = generateGroupSummary(scores, responseCount, surveyTypeLabel, env);
 
   return (
     <div className="bg-white rounded-xl border border-slate-200 shadow-sm mb-6 overflow-hidden">
@@ -453,7 +464,9 @@ const SURVEY_TYPE_LABELS: Record<SurveyTypeFilter, string> = {
   behavior: '行動実績',
 };
 
-export default function ResultsClient({ token, organizationName }: Props) {
+export default function ResultsClient({ token, organizationName, isStudent = false }: Props) {
+  // 学生版は Layer2 を「環境」（ゼミ・授業・サークル等の場）として表示する
+  const ENV = isStudent ? '環境' : '組織';
   const [results, setResults] = useState<ResultsData | null>(null);
   const [individuals, setIndividuals] = useState<IndividualResult[]>([]);
   const [loading, setLoading] = useState(true);
@@ -508,8 +521,8 @@ export default function ResultsClient({ token, organizationName }: Props) {
     // ヘッダー行
     const headers = [
       '名前', '回答日', '診断種別',
-      ...muscleNames.flatMap(name => [`${name}（個人）`, `${name}（組織）`]),
-      '個人スコア平均', '組織スコア平均',
+      ...muscleNames.flatMap(name => [`${name}（個人）`, `${name}（${ENV}）`]),
+      '個人スコア平均', `${ENV}スコア平均`,
     ];
 
     // データ行
@@ -672,7 +685,7 @@ export default function ResultsClient({ token, organizationName }: Props) {
           </div>
           <div className="bg-white rounded-xl border border-slate-200 p-4 text-center">
             <div className="text-3xl font-bold text-green-600">{avgOrganization.toFixed(2)}</div>
-            <div className="text-xs text-slate-500 mt-1">組織スコア平均</div>
+            <div className="text-xs text-slate-500 mt-1">{ENV}スコア平均</div>
           </div>
           <div className="bg-white rounded-xl border border-slate-200 p-4 text-center">
             <div className="text-3xl font-bold text-slate-600">10</div>
@@ -688,7 +701,7 @@ export default function ResultsClient({ token, organizationName }: Props) {
               tab === 'org' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'
             }`}
           >
-            組織全体
+            {isStudent ? '全体' : '組織全体'}
           </button>
           <button
             onClick={() => setTab('individual')}
@@ -719,22 +732,23 @@ export default function ResultsClient({ token, organizationName }: Props) {
                   scores={results.scores}
                   responseCount={results.responseCount}
                   surveyTypeLabel={SURVEY_TYPE_LABELS[surveyTypeFilter]}
+                  env={ENV}
                 />
 
                 <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 mb-6">
                   <h2 className="text-lg font-semibold text-slate-800 mb-1">レーダーチャート</h2>
-                  <p className="text-sm text-slate-500 mb-4">10筋肉の個人平均（青）と組織平均（緑）</p>
+                  <p className="text-sm text-slate-500 mb-4">10筋肉の個人平均（青）と{ENV}平均（緑）</p>
                   <SurveyRadarChart data={radarData} />
                 </div>
 
                 <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 mb-6">
                   <h2 className="text-lg font-semibold text-slate-800 mb-1">4象限マトリクス</h2>
-                  <p className="text-sm text-slate-500 mb-4">横軸=個人スコア、縦軸=組織スコア（中心=3.0）</p>
+                  <p className="text-sm text-slate-500 mb-4">横軸=個人スコア、縦軸={ENV}スコア（中心=3.0）</p>
                   <QuadrantMatrix data={matrixData} />
                   <div className="mt-6 grid grid-cols-2 gap-3">
                     <div className="bg-green-50 border border-green-200 rounded-lg p-3">
                       <div className="font-semibold text-green-800 text-sm mb-1">右上：発揮できている</div>
-                      <p className="text-green-700 text-xs">個人の力が高く、組織環境も整っている</p>
+                      <p className="text-green-700 text-xs">個人の力が高く、{isStudent ? '環境' : '組織環境'}も整っている</p>
                       <div className="mt-2 flex flex-wrap gap-1">
                         {quadrantGroups.both_high.map(s => (
                           <span key={s.muscleIndex} className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">{MUSCLES[s.muscleIndex].name}</span>
@@ -744,7 +758,7 @@ export default function ResultsClient({ token, organizationName }: Props) {
                     </div>
                     <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
                       <div className="font-semibold text-blue-800 text-sm mb-1">右下：環境が阻害中</div>
-                      <p className="text-blue-700 text-xs">個人の力はあるが、組織環境が整っていない</p>
+                      <p className="text-blue-700 text-xs">個人の力はあるが、{isStudent ? '環境' : '組織環境'}が整っていない</p>
                       <div className="mt-2 flex flex-wrap gap-1">
                         {quadrantGroups.org_low.map(s => (
                           <span key={s.muscleIndex} className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">{MUSCLES[s.muscleIndex].name}</span>
@@ -754,7 +768,7 @@ export default function ResultsClient({ token, organizationName }: Props) {
                     </div>
                     <div className="bg-orange-50 border border-orange-200 rounded-lg p-3">
                       <div className="font-semibold text-orange-800 text-sm mb-1">左上：個人が課題</div>
-                      <p className="text-orange-700 text-xs">組織環境は整っているが、個人の力が課題</p>
+                      <p className="text-orange-700 text-xs">{isStudent ? '環境' : '組織環境'}は整っているが、個人の力が課題</p>
                       <div className="mt-2 flex flex-wrap gap-1">
                         {quadrantGroups.individual_low.map(s => (
                           <span key={s.muscleIndex} className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">{MUSCLES[s.muscleIndex].name}</span>
@@ -764,7 +778,7 @@ export default function ResultsClient({ token, organizationName }: Props) {
                     </div>
                     <div className="bg-red-50 border border-red-200 rounded-lg p-3">
                       <div className="font-semibold text-red-800 text-sm mb-1">左下：両方に課題</div>
-                      <p className="text-red-700 text-xs">個人・組織の両方で強化が必要</p>
+                      <p className="text-red-700 text-xs">個人・{ENV}の両方で強化が必要</p>
                       <div className="mt-2 flex flex-wrap gap-1">
                         {quadrantGroups.both_low.map(s => (
                           <span key={s.muscleIndex} className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full">{MUSCLES[s.muscleIndex].name}</span>
@@ -779,7 +793,7 @@ export default function ResultsClient({ token, organizationName }: Props) {
                   <div className="px-6 py-4 border-b border-slate-100">
                     <h2 className="text-lg font-semibold text-slate-800">筋肉別スコア一覧</h2>
                   </div>
-                  <ScoreTable scores={results.scores} />
+                  <ScoreTable scores={results.scores} env={ENV} />
                 </div>
               </>
             )}
@@ -870,7 +884,7 @@ export default function ResultsClient({ token, organizationName }: Props) {
                         <div className="flex items-center gap-6">
                           <div className="hidden sm:flex gap-6 text-sm">
                             <span>個人 <span className="font-bold text-blue-600">{avgInd.toFixed(2)}</span></span>
-                            <span>組織 <span className="font-bold text-green-600">{avgOrg.toFixed(2)}</span></span>
+                            <span>{ENV} <span className="font-bold text-green-600">{avgOrg.toFixed(2)}</span></span>
                           </div>
                           <svg
                             className={`w-5 h-5 text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`}
@@ -897,11 +911,11 @@ export default function ResultsClient({ token, organizationName }: Props) {
                             </div>
                             <div className="bg-green-50 rounded-lg p-3 text-center">
                               <div className="text-2xl font-bold text-green-600">{avgOrg.toFixed(2)}</div>
-                              <div className="text-xs text-slate-500 mt-0.5">組織スコア（本人）</div>
+                              <div className="text-xs text-slate-500 mt-0.5">{ENV}スコア（本人）</div>
                             </div>
                             <div className="bg-slate-50 rounded-lg p-3 text-center">
                               <div className="text-2xl font-bold text-slate-500">{avgOrganization.toFixed(2)}</div>
-                              <div className="text-xs text-slate-500 mt-0.5">組織スコア（全体平均）</div>
+                              <div className="text-xs text-slate-500 mt-0.5">{ENV}スコア（全体平均）</div>
                               <div className="mt-1"><DiffBadge diff={orgDiffFromAvg} /></div>
                             </div>
                           </div>
@@ -915,13 +929,14 @@ export default function ResultsClient({ token, organizationName }: Props) {
                           <div>
                             <h3 className="text-sm font-semibold text-slate-700 mb-3">筋肉別スコア</h3>
                             <div className="rounded-lg border border-slate-100 overflow-hidden">
-                              <ScoreTable scores={person.scores} avgScores={results.responseCount > 1 ? results.scores : undefined} />
+                              <ScoreTable scores={person.scores} avgScores={results.responseCount > 1 ? results.scores : undefined} env={ENV} />
                             </div>
                           </div>
 
                           <FeedbackSection
                             scores={person.scores}
                             avgScores={results.responseCount > 1 ? results.scores : undefined}
+                            env={ENV}
                           />
                         </div>
                       )}

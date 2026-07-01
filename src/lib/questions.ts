@@ -203,6 +203,142 @@ export const BEHAVIORAL_QUESTION_TEXTS: Record<string, string> = {
   'Q10-6': 'この半年で、「誰かがやるだろう」という傍観者意識を感じた場面があった',
 };
 
+// ============================================================
+// 学生版（大学生）：各筋肉4問（個人2＋環境2）の軽量版 = 全40問
+// 設問IDは既存の「非逆転(reversed:false)」IDを再利用しているため、
+// 集計・結果・メールのロジック（QUESTIONSでID→筋肉/レイヤーを引く実装）を
+// 変更せずにそのまま使える。Layer2の「この場では」は、回答者が普段参加する
+// ゼミ・授業・サークル・バイト先などの場を思い浮かべて答える想定。
+// ============================================================
+export const STUDENT_QUESTIONS: Question[] = [
+  // 1. 好奇心
+  { id: 'Q1-1', muscleIndex: 0, layer: 1, text: '自分と違う意見に出会ったとき、否定する前に「なぜそう考えるんだろう」と興味がわく', reversed: false },
+  { id: 'Q1-2', muscleIndex: 0, layer: 1, text: '知らないことや新しい視点に対して、面白がって受け止めている', reversed: false },
+  { id: 'Q1-4', muscleIndex: 0, layer: 2, text: 'この場では、新しいアイデアや違う視点が歓迎される', reversed: false },
+  { id: 'Q1-5', muscleIndex: 0, layer: 2, text: 'この場では、お互いの考えを「もっと聞きたい」と掘り下げる会話がある', reversed: false },
+
+  // 2. 傾聴
+  { id: 'Q2-1', muscleIndex: 1, layer: 1, text: '相手が話している間は、反論を考えるより相手の話に集中している', reversed: false },
+  { id: 'Q2-2', muscleIndex: 1, layer: 1, text: '相手の言いたいことが曖昧なときは、確認する質問をしている', reversed: false },
+  { id: 'Q2-4', muscleIndex: 1, layer: 2, text: 'この場では、誰かが話しているときは最後まで聞く雰囲気がある', reversed: false },
+  { id: 'Q2-5', muscleIndex: 1, layer: 2, text: 'この場では、話の途中でさえぎられたり結論だけ急かされたりすることが少ない', reversed: false },
+
+  // 3. 共感
+  { id: 'Q3-1', muscleIndex: 2, layer: 1, text: '意見が違う相手でも、その人がなぜそう考えるのか理解しようとしている', reversed: false },
+  { id: 'Q3-2', muscleIndex: 2, layer: 1, text: '自分とは立場や背景が違う人の気持ちを想像している', reversed: false },
+  { id: 'Q3-4', muscleIndex: 2, layer: 2, text: 'この場では、立場の違う人の事情も考えに入れて話が進む', reversed: false },
+  { id: 'Q3-5', muscleIndex: 2, layer: 2, text: 'この場では、少数派の気持ちに立って考えようとする雰囲気がある', reversed: false },
+
+  // 4. 勇気
+  { id: 'Q4-1', muscleIndex: 3, layer: 1, text: '納得できないことがあれば、その場で正直に伝えている', reversed: false },
+  { id: 'Q4-2', muscleIndex: 3, layer: 1, text: 'どう思われるかより、正しいと思うことを優先して発言している', reversed: false },
+  { id: 'Q4-4', muscleIndex: 3, layer: 2, text: 'この場では、本音を言っても大丈夫だと感じられる', reversed: false },
+  { id: 'Q4-6', muscleIndex: 3, layer: 2, text: 'この場では、ありのままの自分で参加できる雰囲気がある', reversed: false },
+
+  // 5. 意見
+  { id: 'Q5-1', muscleIndex: 4, layer: 1, text: '話し合いで「どっちでもいい」と流さず、自分の立場をはっきり示している', reversed: false },
+  { id: 'Q5-2', muscleIndex: 4, layer: 1, text: 'なぜそう思うのか、理由を持って意見を言っている', reversed: false },
+  { id: 'Q5-4', muscleIndex: 4, layer: 2, text: 'この場では、メンバーが理由を持って自分の意見を述べる場面が多い', reversed: false },
+  { id: 'Q5-6', muscleIndex: 4, layer: 2, text: 'この場では、自分の立場をはっきりさせて発言することが受け入れられる', reversed: false },
+
+  // 6. 反対意見
+  { id: 'Q6-1', muscleIndex: 5, layer: 1, text: '相手に反対するときも、感情的にならず建設的に伝えている', reversed: false },
+  { id: 'Q6-2', muscleIndex: 5, layer: 1, text: '反対意見を言った後も、相手との関係を壊さずにいられる', reversed: false },
+  { id: 'Q6-4', muscleIndex: 5, layer: 2, text: 'この場では、反対意見を言っても人間関係が壊れない', reversed: false },
+  { id: 'Q6-5', muscleIndex: 5, layer: 2, text: 'この場では、決定への反論が後からではなく話し合いの場で出てくる', reversed: false },
+
+  // 7. 言葉への自信
+  { id: 'Q7-1', muscleIndex: 6, layer: 1, text: '先輩や教員がいる場でも、自分の意見を発言している', reversed: false },
+  { id: 'Q7-2', muscleIndex: 6, layer: 1, text: '自分の考えを、相手に伝わるように言葉にできている', reversed: false },
+  { id: 'Q7-4', muscleIndex: 6, layer: 2, text: 'この場では、学年や立場に関係なく誰もが意見を言える', reversed: false },
+  { id: 'Q7-5', muscleIndex: 6, layer: 2, text: 'この場では、発言する人がいつも同じ数人に固定されていない', reversed: false },
+
+  // 8. 妥協
+  { id: 'Q8-1', muscleIndex: 7, layer: 1, text: '自分の意見が通らないときも、より良い案を探して柔軟に動いている', reversed: false },
+  { id: 'Q8-2', muscleIndex: 7, layer: 1, text: '対立する意見を統合して、新しい案を提案することがある', reversed: false },
+  { id: 'Q8-4', muscleIndex: 7, layer: 2, text: 'この場では、意見の対立が「どちらが勝つか」ではなく「より良い案を探す」方向に向かう', reversed: false },
+  { id: 'Q8-5', muscleIndex: 7, layer: 2, text: 'この場では、納得いくまで話し合うための時間が取られている', reversed: false },
+
+  // 9. 活動家
+  { id: 'Q9-1', muscleIndex: 8, layer: 1, text: '「おかしい」と思ったことは、口にするだけでなく自分から動いて変えようとしている', reversed: false },
+  { id: 'Q9-2', muscleIndex: 8, layer: 1, text: '自分の関わる場をより良くするために、具体的な行動を起こしている', reversed: false },
+  { id: 'Q9-4', muscleIndex: 8, layer: 2, text: 'この場では、メンバーが自分たちで課題を見つけて動くことが歓迎される', reversed: false },
+  { id: 'Q9-5', muscleIndex: 8, layer: 2, text: 'この場では、「誰かがやってくれる」ではなく自分ごととして取り組む人が多い', reversed: false },
+
+  // 10. 動員
+  { id: 'Q10-1', muscleIndex: 9, layer: 1, text: '自分の考えに共感してくれる仲間を巻き込んで進めることができる', reversed: false },
+  { id: 'Q10-2', muscleIndex: 9, layer: 1, text: '何かを変えたいとき、周りに声をかけて協力を集めている', reversed: false },
+  { id: 'Q10-4', muscleIndex: 9, layer: 2, text: 'この場では、誰かの呼びかけに人が集まって動くことがある', reversed: false },
+  { id: 'Q10-5', muscleIndex: 9, layer: 2, text: 'この場では、一人の問題意識がみんなの行動に広がっていく', reversed: false },
+];
+
+export const STUDENT_LAYER1_QUESTIONS = STUDENT_QUESTIONS.filter(q => q.layer === 1);
+export const STUDENT_LAYER2_QUESTIONS = STUDENT_QUESTIONS.filter(q => q.layer === 2);
+
+// 学生版・行動実績バージョン：意識ではなく「この半年で実際にあったか」を問う
+export const STUDENT_BEHAVIORAL_QUESTION_TEXTS: Record<string, string> = {
+  // 好奇心
+  'Q1-1': 'この半年で、自分と違う意見の相手に「なぜそう思うの？」と質問した',
+  'Q1-2': 'この半年で、知らないことや新しい視点を面白がって受け入れた',
+  'Q1-4': 'この半年で、この場で新しいアイデアや違う視点が歓迎される場面があった',
+  'Q1-5': 'この半年で、この場でお互いの考えを掘り下げる会話があった',
+  // 傾聴
+  'Q2-1': 'この半年で、相手が話している間、反論より先に相手の話に集中した',
+  'Q2-2': 'この半年で、相手の言いたいことが曖昧なとき確認の質問をした',
+  'Q2-4': 'この半年で、この場で誰かが話しているとき最後まで聞かれる場面があった',
+  'Q2-5': 'この半年で、この場で話をさえぎられず最後まで聞いてもらえた',
+  // 共感
+  'Q3-1': 'この半年で、意見が違う相手がなぜそう考えるのか理解しようとした',
+  'Q3-2': 'この半年で、立場や背景が違う人の気持ちを想像して行動した',
+  'Q3-4': 'この半年で、この場で立場の違う人の事情も考えに入れて話が進んだ',
+  'Q3-5': 'この半年で、この場で少数派の気持ちに立って考えようとする場面があった',
+  // 勇気
+  'Q4-1': 'この半年で、納得できないことをその場で正直に伝えた',
+  'Q4-2': 'この半年で、どう思われるかより正しいと思うことを優先して発言した',
+  'Q4-4': 'この半年で、この場で本音を言っても大丈夫だと感じた',
+  'Q4-6': 'この半年で、この場でありのままの自分で参加できた',
+  // 意見
+  'Q5-1': 'この半年で、話し合いで「どっちでもいい」と流さず自分の立場を示した',
+  'Q5-2': 'この半年で、理由を持って自分の意見を言った',
+  'Q5-4': 'この半年で、この場でメンバーが理由を持って意見を述べる場面があった',
+  'Q5-6': 'この半年で、この場で自分の立場をはっきり示して発言できた',
+  // 反対意見
+  'Q6-1': 'この半年で、相手に反対するとき感情的にならず建設的に伝えた',
+  'Q6-2': 'この半年で、反対意見を言った後も相手との関係を保てた',
+  'Q6-4': 'この半年で、この場で反対意見を言っても人間関係が壊れなかった',
+  'Q6-5': 'この半年で、この場で決定への反論が話し合いの場で出てきた',
+  // 言葉への自信
+  'Q7-1': 'この半年で、先輩や教員がいる場でも自分の意見を発言した',
+  'Q7-2': 'この半年で、自分の考えを相手に伝わるように言葉にできた',
+  'Q7-4': 'この半年で、この場で学年や立場に関係なく誰もが意見を言えた',
+  'Q7-5': 'この半年で、この場で発言する人が特定の数人に偏らなかった',
+  // 妥協
+  'Q8-1': 'この半年で、自分の意見が通らないときもより良い案を探して動いた',
+  'Q8-2': 'この半年で、対立する意見を統合した新しい案を提案した',
+  'Q8-4': 'この半年で、この場で対立が「より良い案を探す」方向に向かった',
+  'Q8-5': 'この半年で、この場で納得いくまで話し合う時間が取られた',
+  // 活動家
+  'Q9-1': 'この半年で、「おかしい」と思ったことを自分から動いて変えようとした',
+  'Q9-2': 'この半年で、関わる場をより良くするため具体的な行動を起こした',
+  'Q9-4': 'この半年で、この場でメンバーが自分たちで課題を見つけて動く場面があった',
+  'Q9-5': 'この半年で、この場で「誰かがやってくれる」ではなく自分ごとで取り組む人がいた',
+  // 動員
+  'Q10-1': 'この半年で、自分の考えに共感してくれる仲間を巻き込んで進めた',
+  'Q10-2': 'この半年で、何かを変えたいとき周りに声をかけて協力を集めた',
+  'Q10-4': 'この半年で、この場で誰かの呼びかけに人が集まって動いた',
+  'Q10-5': 'この半年で、この場で一人の問題意識がみんなの行動に広がった',
+};
+
+export type Edition = 'business' | 'student';
+
+// edition に応じた設問セット・行動実績テキストを返すヘルパー
+export function getQuestionSet(edition: Edition): Question[] {
+  return edition === 'student' ? STUDENT_QUESTIONS : QUESTIONS;
+}
+export function getBehavioralTexts(edition: Edition): Record<string, string> {
+  return edition === 'student' ? STUDENT_BEHAVIORAL_QUESTION_TEXTS : BEHAVIORAL_QUESTION_TEXTS;
+}
+
 export function transformScore(score: number, reversed: boolean): number {
   if (reversed) {
     return 5 - score + 1;
