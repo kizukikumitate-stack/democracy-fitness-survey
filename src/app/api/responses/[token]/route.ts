@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
-import { QUESTIONS, MUSCLES, transformScore, getQuestionSet, type Edition } from '@/lib/questions';
+import { QUESTIONS, MUSCLES, transformScore, getQuestionSet } from '@/lib/questions';
 import { sendResultEmail } from '@/lib/sendResultEmail';
 
 export async function POST(
