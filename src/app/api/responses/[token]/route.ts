@@ -41,6 +41,17 @@ export async function POST(
     const name = respondentName?.trim() || '匿名';
     const email = typeof respondentEmail === 'string' ? respondentEmail.trim() : '';
 
+    // 学生版は受講前後の変化を追うため、お名前・メールアドレスを必須にする
+    if (edition === 'student') {
+      const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+      if (!respondentName?.trim() || !emailValid) {
+        return NextResponse.json(
+          { error: 'お名前と有効なメールアドレスは必須です' },
+          { status: 400 }
+        );
+      }
+    }
+
     // まず全列込みで INSERT を試みる
     let { data, error } = await supabase
       .from('responses')

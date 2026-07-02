@@ -198,7 +198,14 @@ export default function SurveyPage() {
   const part1AnsweredCount = layer1Questions.filter(q => answers[q.id] !== undefined).length;
   const part2AnsweredCount = layer2Questions.filter(q => answers[q.id] !== undefined).length;
 
+  // 学生版は受講前後の変化を追うため、名前・メールを必須にする（法人版・匿名運用は任意のまま）
+  const identityRequired = isStudent;
+  const nameValid = respondentName.trim().length > 0;
+  const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(respondentEmail.trim());
+  const identityOk = !identityRequired || (nameValid && emailValid);
+
   const handleSubmit = async () => {
+    if (!identityOk) { setPageState('part1'); window.scrollTo({ top: 0, behavior: 'smooth' }); return; }
     setPageState('submitting');
     try {
       const res = await fetch(`/api/responses/${token}`, {
@@ -424,14 +431,16 @@ export default function SurveyPage() {
             <div className="flex flex-col sm:flex-row gap-4">
               <div className="flex-1">
                 <label className="block text-sm font-medium text-slate-700 mb-2">
-                  お名前（任意）
+                  お名前{identityRequired ? <span className="text-red-500">（必須）</span> : '（任意）'}
                 </label>
                 <input
                   type="text"
                   value={respondentName}
                   onChange={e => setRespondentName(e.target.value)}
-                  placeholder="匿名でも回答できます"
-                  className="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+                  placeholder={identityRequired ? '例：山田 太郎' : '匿名でも回答できます'}
+                  required={identityRequired}
+                  aria-invalid={identityRequired && !nameValid}
+                  className={`w-full px-4 py-2.5 border rounded-lg text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition ${identityRequired && !nameValid ? 'border-red-300' : 'border-slate-300'}`}
                 />
               </div>
               <div className="flex-1">
@@ -448,16 +457,25 @@ export default function SurveyPage() {
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">
-                メールアドレス（任意）
+                メールアドレス{identityRequired ? <span className="text-red-500">（必須）</span> : '（任意）'}
               </label>
               <input
                 type="email"
                 value={respondentEmail}
                 onChange={e => setRespondentEmail(e.target.value)}
-                placeholder="入力すると診断結果がメールで届きます"
-                className="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+                placeholder="例：taro@example.com"
+                required={identityRequired}
+                aria-invalid={identityRequired && !emailValid}
+                className={`w-full px-4 py-2.5 border rounded-lg text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition ${identityRequired && respondentEmail.trim() !== '' && !emailValid ? 'border-red-300' : 'border-slate-300'}`}
               />
-              {respondentEmail && (
+              {identityRequired && respondentEmail.trim() !== '' && !emailValid && (
+                <p className="text-xs text-red-500 mt-1.5">メールアドレスの形式が正しくありません</p>
+              )}
+              {identityRequired ? (
+                <p className="text-xs text-slate-500 mt-1.5">
+                  受講前後の変化を比較するために使用します。結果もこのアドレスにお送りします。
+                </p>
+              ) : respondentEmail && (
                 <p className="text-xs text-blue-600 mt-1.5">回答送信後に結果をメールでお届けします</p>
               )}
             </div>
@@ -536,11 +554,15 @@ export default function SurveyPage() {
                   <p className="text-sm font-medium text-slate-700">
                     {part1Answered ? 'Part 1 完了！' : `残り ${totalQuestions - currentAnsweredCount} 問`}
                   </p>
-                  <p className="text-xs text-slate-400">次へ進むと{envLabel}になります</p>
+                  <p className="text-xs text-slate-400">
+                    {part1Answered && !identityOk
+                      ? 'お名前とメールアドレスの入力が必要です'
+                      : `次へ進むと${envLabel}になります`}
+                  </p>
                 </div>
                 <button
                   onClick={() => { setPageState('part2'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-                  disabled={!part1Answered}
+                  disabled={!part1Answered || !identityOk}
                   className="px-6 py-2.5 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition"
                 >
                   Part 2 へ進む
@@ -557,12 +579,14 @@ export default function SurveyPage() {
                   </button>
                 </div>
                 <div className="text-right">
-                  <p className="text-xs text-slate-400 mb-1">
-                    {part2Answered ? '全問回答済みです' : `残り ${totalQuestions - currentAnsweredCount} 問`}
+                  <p className={`text-xs mb-1 ${part2Answered && !identityOk ? 'text-red-500' : 'text-slate-400'}`}>
+                    {part2Answered
+                      ? (identityOk ? '全問回答済みです' : 'Part 1 でお名前とメールの入力が必要です')
+                      : `残り ${totalQuestions - currentAnsweredCount} 問`}
                   </p>
                   <button
                     onClick={handleSubmit}
-                    disabled={!part2Answered || pageState === 'submitting'}
+                    disabled={!part2Answered || !identityOk || pageState === 'submitting'}
                     className="px-6 py-2.5 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 disabled:opacity-40 disabled:cursor-not-allowed transition"
                   >
                     {pageState === 'submitting' ? '送信中...' : '回答を送信する'}
