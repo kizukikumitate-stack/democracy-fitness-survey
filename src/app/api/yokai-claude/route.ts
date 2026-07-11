@@ -42,6 +42,21 @@ export async function OPTIONS(req: NextRequest) {
   return new NextResponse(null, { status: 204, headers: corsHeaders(req.headers.get('origin')) });
 }
 
+// 診断用（キー値は返さず有無と長さのみ）。切り分けが済んだら削除する。
+export async function GET(req: NextRequest) {
+  return NextResponse.json(
+    {
+      marker: 'envcheck-1',
+      hasAnthropic: !!process.env.ANTHROPIC_API_KEY,
+      anthropicLen: (process.env.ANTHROPIC_API_KEY || '').length,
+      anthropicPrefix: (process.env.ANTHROPIC_API_KEY || '').slice(0, 7),
+      hasSupabase: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
+      model: process.env.YOKAI_CLAUDE_MODEL || null,
+    },
+    { status: 200, headers: corsHeaders(req.headers.get('origin')) }
+  );
+}
+
 // ---- 簡易レート制限（ベストエフォート。Vercelのインスタンスは使い捨てなので厳密ではない） ----
 const RATE_WINDOW_MS = 60_000;
 const RATE_MAX = 40; // 1インスタンスあたり毎分40リクエストまで
