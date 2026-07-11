@@ -42,21 +42,6 @@ export async function OPTIONS(req: NextRequest) {
   return new NextResponse(null, { status: 204, headers: corsHeaders(req.headers.get('origin')) });
 }
 
-// 診断用（キー値は返さず有無と長さのみ）。切り分けが済んだら削除する。
-export async function GET(req: NextRequest) {
-  return NextResponse.json(
-    {
-      marker: 'envcheck-1',
-      hasAnthropic: !!process.env.ANTHROPIC_API_KEY,
-      anthropicLen: (process.env.ANTHROPIC_API_KEY || '').length,
-      anthropicPrefix: (process.env.ANTHROPIC_API_KEY || '').slice(0, 7),
-      hasSupabase: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
-      model: process.env.YOKAI_CLAUDE_MODEL || null,
-    },
-    { status: 200, headers: corsHeaders(req.headers.get('origin')) }
-  );
-}
-
 // ---- 簡易レート制限（ベストエフォート。Vercelのインスタンスは使い捨てなので厳密ではない） ----
 const RATE_WINDOW_MS = 60_000;
 const RATE_MAX = 40; // 1インスタンスあたり毎分40リクエストまで
@@ -214,16 +199,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ text }, { status: 200, headers: cors });
   } catch (err) {
     console.error('POST /api/yokai-claude anthropic error:', err);
-    // 一時診断: 上流(Anthropic)の実エラーを可視化（切り分け後に削除）
-    const e = err as { status?: number; error?: { error?: { type?: string; message?: string } }; message?: string };
-    return NextResponse.json(
-      {
-        error: 'upstream_failed',
-        upstreamStatus: e?.status ?? null,
-        upstreamType: e?.error?.error?.type ?? null,
-        upstreamMessage: (e?.error?.error?.message ?? e?.message ?? '').slice(0, 200),
-      },
-      { status: 502, headers: cors }
-    );
+    return NextResponse.json({ error: 'upstream_failed' }, { status: 502, headers: cors });
   }
 }
