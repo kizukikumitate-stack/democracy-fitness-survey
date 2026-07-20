@@ -156,7 +156,12 @@ export async function POST(req: NextRequest) {
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
   const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
   if (!webhookSecret || !stripeSecretKey) {
-    console.error('POST /api/stripe-webhook: STRIPE_WEBHOOK_SECRET / STRIPE_SECRET_KEY が未設定');
+    // どちらが欠けているかログに残す。値そのものは絶対に出さない（長さのみ）。
+    const missing = [
+      !stripeSecretKey ? 'STRIPE_SECRET_KEY' : `STRIPE_SECRET_KEY=OK(len:${stripeSecretKey.length})`,
+      !webhookSecret ? 'STRIPE_WEBHOOK_SECRET' : `STRIPE_WEBHOOK_SECRET=OK(len:${webhookSecret.length})`,
+    ].join(' / ');
+    console.error(`POST /api/stripe-webhook: 環境変数が未設定 -> ${missing}`);
     // 500 を返すと Stripe がリトライしてくれる（設定後に自動で復旧する）
     return NextResponse.json({ error: 'Stripe not configured' }, { status: 500 });
   }
