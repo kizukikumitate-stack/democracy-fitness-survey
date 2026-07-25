@@ -99,6 +99,14 @@ type Parsed = {
   themes?: unknown;
 };
 
+/* 絵文字は 👩‍💼 のような結合文字があるため「先頭1文字を切る」と壊れる。
+   短ければそのまま通し、長すぎる（説明文が混ざった等）ときだけ既定値に落とす。 */
+const emojiOf = (v: unknown): string => {
+  if (typeof v !== 'string') return '🧑';
+  const t = v.trim();
+  return t && Array.from(t).length <= 8 ? t : '🧑';
+};
+
 const strList = (v: unknown, len: number, max: number): string[] =>
   Array.isArray(v)
     ? v.filter((s): s is string => typeof s === 'string').map((s) => s.slice(0, len)).slice(0, max)
@@ -161,7 +169,7 @@ export async function POST(req: NextRequest) {
           .filter((s): s is Record<string, unknown> => !!s && typeof s === 'object')
           .map((s) => ({
             name: typeof s.name === 'string' ? s.name.slice(0, 12) : '',
-            emoji: typeof s.emoji === 'string' && s.emoji ? [...s.emoji][0] : '🧑',
+            emoji: emojiOf(s.emoji),
             situation: typeof s.situation === 'string' ? s.situation.slice(0, 60) : '',
           }))
           .filter((s) => s.name)
