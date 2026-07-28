@@ -33,6 +33,15 @@ const TEMPLATES: Record<string, ReminderTemplate> = {
   },
 };
 
+// 同じイベントに2通目以降を送るための名前付き文面。
+// リクエストで template を明示したときだけ使われる（既定文面を上書きしない）。
+const NAMED_TEMPLATES: Record<string, ReminderTemplate> = {
+  'df-camp-2026-08:precamp': {
+    subject: '【8/11-12 合宿】当日までのご案内 — 持ち物・アクセス・相乗りのご相談',
+    build: (r) => buildCampPrecampHtml(r.name),
+  },
+};
+
 export async function POST(req: NextRequest) {
   const adminKey = process.env.EVENTS_ADMIN_KEY;
   if (!adminKey) {
@@ -46,15 +55,32 @@ export async function POST(req: NextRequest) {
   if (!body || typeof body !== 'object') {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
-  const { event_id, mode, testEmail } = body as { event_id?: unknown; mode?: unknown; testEmail?: unknown };
+  const { event_id, mode, testEmail, template: templateKey } = body as {
+    event_id?: unknown; mode?: unknown; testEmail?: unknown; template?: unknown;
+  };
 
-  if (typeof event_id !== 'string' || !TEMPLATES[event_id]) {
-    return NextResponse.json({ error: 'unknown_event', message: 'このイベントのリマインド文面が未登録です' }, { status: 400 });
+  if (typeof event_id !== 'string') {
+    return NextResponse.json({ error: 'unknown_event', message: 'event_id を指定してください' }, { status: 400 });
+  }
+  // template 未指定ならイベントの既定文面。同じイベントに2通目以降を送るときは template で明示する。
+  const template = typeof templateKey === 'string'
+    ? NAMED_TEMPLATES[templateKey]
+    : TEMPLATES[event_id];
+  if (!template) {
+    return NextResponse.json(
+      {
+        error: 'unknown_template',
+        message: typeof templateKey === 'string'
+          ? `template='${templateKey}' は未登録です`
+          : 'このイベントの既定文面が未登録です',
+        availableTemplates: Object.keys(NAMED_TEMPLATES),
+      },
+      { status: 400 },
+    );
   }
   if (mode !== 'count' && mode !== 'test' && mode !== 'send') {
     return NextResponse.json({ error: 'invalid_mode' }, { status: 400 });
   }
-  const template = TEMPLATES[event_id];
 
   // 申込者を取得（email で重複排除、最新の申込内容を採用）
   const recipients: { email: string; name: string; metadata: Record<string, unknown> | null }[] = [];
@@ -336,4 +362,135 @@ function escapeHtml(s: string): string {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+}
+
+// =============================================================
+// 8/11-12 合宿 事前案内（開催約2週間前）
+// =============================================================
+const CAMP_FB_GROUP_URL = 'https://www.facebook.com/groups/3282829055236814';
+const CAMP_FB_PROFILE_URL = 'https://www.facebook.com/yasuhito.morimoto/';
+
+function buildCampPrecampHtml(name: string): string {
+  const h2 = (t: string) =>
+    `<h2 style="margin:28px 0 10px;font-size:15px;font-weight:700;color:#1c3329;border-bottom:2px solid #f0b429;padding-bottom:6px;">${t}</h2>`;
+  const p = (t: string) =>
+    `<p style="margin:0 0 14px;font-size:14px;color:#475569;line-height:1.9;">${t}</p>`;
+
+  return `<!DOCTYPE html>
+<html lang="ja">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#f8f6ff;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Hiragino Sans',sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f8f6ff;padding:32px 16px;">
+<tr><td align="center">
+<table width="100%" cellpadding="0" cellspacing="0" style="max-width:620px;">
+
+  <tr><td style="background:#1c3329;border-radius:12px 12px 0 0;padding:28px 32px;">
+    <p style="margin:0 0 4px;font-size:12px;color:#f0b429;letter-spacing:0.15em;">DEMOCRACY FITNESS CAMP 2026</p>
+    <h1 style="margin:0;font-size:20px;font-weight:700;color:#ffffff;line-height:1.5;">当日までのご案内</h1>
+  </td></tr>
+
+  <tr><td style="background:#ffffff;padding:28px 32px;">
+    <p style="margin:0 0 18px;font-size:14px;color:#1a1a2e;">${escapeHtml(name)} 様</p>
+
+    ${p('デモクラシーフィットネス キャンプ2026 in 北軽井沢のお申込み、ありがとうございます。<br>開催まで約2週間となりましたので、当日までのご案内をお送りします。')}
+    ${p('長めのメールですが、<strong>「持ち物」と「軽井沢駅からの移動」の2つ</strong>は当日に直結しますので、そこだけでもお目通しください。')}
+
+    ${h2('開催概要')}
+    <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin:0 0 8px;font-size:13px;">
+      <tr>
+        <th align="left" style="padding:10px 12px;background:#f1f5f9;border:1px solid #e2e8f0;width:26%;color:#475569;font-weight:600;">日程</th>
+        <td style="padding:10px 12px;border:1px solid #e2e8f0;color:#1a1a2e;">2026年8月11日（火）10:00 〜 8月12日（水）17:00</td>
+      </tr>
+      <tr>
+        <th align="left" style="padding:10px 12px;background:#f1f5f9;border:1px solid #e2e8f0;color:#475569;font-weight:600;">会場</th>
+        <td style="padding:10px 12px;border:1px solid #e2e8f0;color:#1a1a2e;">TAKIVIVA（群馬県吾妻郡・北軽井沢／軽井沢駅から車で約30分）</td>
+      </tr>
+      <tr>
+        <th align="left" style="padding:10px 12px;background:#f1f5f9;border:1px solid #e2e8f0;color:#475569;font-weight:600;">集合</th>
+        <td style="padding:10px 12px;border:1px solid #e2e8f0;color:#1a1a2e;"><strong>現地集合・現地解散</strong>です。8月11日（火）10:00 に TAKIVIVA 受付にお越しください</td>
+      </tr>
+    </table>
+    ${p('10:00 からチェックインとウェルカムドリンク、10:30 にオープニングが始まります。')}
+
+    ${h2('軽井沢駅からの移動 — 相乗りのご相談')}
+    ${p('会場までの移動は各自手配をお願いしています。東京駅から軽井沢駅までは北陸新幹線で約70分、軽井沢駅から会場までは車で約30分です。')}
+    <div style="background:#fef3e0;border-left:4px solid #e85d26;padding:16px 20px;margin:0 0 16px;border-radius:0 6px 6px 0;">
+      <p style="margin:0;font-size:13px;color:#1a1a2e;line-height:1.85;">
+        初日は <strong>10:00にオープニング</strong>が始まります。<strong>9時15分までに軽井沢駅にご到着いただく</strong>と、余裕をもって会場入りできます。新幹線をご予約の際の目安になさってください。<br><br>
+        2日目は <strong>17:00に解散</strong>です。会場から軽井沢駅まで車で約30分かかりますので、お帰りの新幹線は <strong>17:40以降</strong>を目安にご予約ください。
+      </p>
+    </div>
+    ${p('現時点で、<strong>お車で来られる方が4〜5名、相乗りやタクシーの乗り合わせをご希望の方が3名</strong>いらっしゃいます。')}
+    ${p('移動の相談だけでなく、持ち物や当日のことなど、<strong>複数のテーマごとにやりとりしやすいよう、Facebookのグループページ</strong>をご用意しました。')}
+    <p style="margin:0 0 14px;font-size:14px;color:#475569;line-height:1.9;">
+      👉 <strong>参加者グループはこちら</strong><br>
+      <a href="${CAMP_FB_GROUP_URL}" style="color:#e85d26;">${CAMP_FB_GROUP_URL}</a>
+    </p>
+    <p style="margin:0 0 14px;font-size:14px;color:#475569;line-height:1.9;">
+      なお、<strong>私（森本康仁）とFacebookで繋がりがない方は、こちらのアカウントに友達申請をいただけますでしょうか。</strong><br>
+      <a href="${CAMP_FB_PROFILE_URL}" style="color:#e85d26;">${CAMP_FB_PROFILE_URL}</a>
+    </p>
+    ${p('グループでは到着時刻を共有していただき、乗り合わせを相談できればと思います。お車で来られる方で「同乗者を乗せられる」という方は、ぜひその旨をお書きください。')}
+
+    <div style="background:#f1f5f9;border-radius:8px;padding:18px 20px;margin:0 0 16px;">
+      <p style="margin:0 0 8px;font-size:14px;font-weight:700;color:#1c3329;">Facebookをお使いでない方へ</p>
+      <p style="margin:0 0 10px;font-size:13px;color:#475569;line-height:1.85;">
+        <strong>Facebookのアカウントをお持ちでない方、普段お使いでない方も、まったく問題ありません。</strong>グループはあくまで相談をしやすくするための場で、参加は任意です。
+      </p>
+      <p style="margin:0;font-size:13px;color:#475569;line-height:1.85;">
+        その場合は、<strong>このメールへの返信で、当日の到着予定時刻（または「まだ未定」）だけお知らせいただけますでしょうか。</strong>こちらで相乗りの調整に入れさせていただきます。グループ内で移動に関する大事な決定があった場合も、私から個別にメールでお伝えしますので、情報から漏れるご心配はありません。
+      </p>
+    </div>
+    ${p('うまく相乗りが決まらない場合も、遠慮なく私（森本）までご連絡ください。タクシーの手配をご一緒に考えます。')}
+
+    ${h2('持ち物')}
+    <ul style="margin:0 0 14px;padding-left:20px;font-size:14px;color:#475569;line-height:1.9;">
+      <li><strong>動きやすい服装と動きやすい靴</strong> — 立って動くワークや、屋外で過ごす時間があります</li>
+      <li><strong>羽織れるもの・薄手の防寒具</strong> — 北軽井沢の夜は夏でも涼しく、例年15℃前後まで冷え込むことがあります</li>
+      <li><strong>スリッパやサンダル</strong> — 館内でリラックスして過ごせます</li>
+      <li><strong>寝巻き・歯ブラシなど</strong> — 寝具とタオル類は会場で用意されます</li>
+      <li>お気に入りのノートがあれば（筆記用具は会場にもあります）</li>
+    </ul>
+
+    ${h2('お支払いについて')}
+    ${p(`<strong>プログラム参加費</strong> — 別途お送りしている振込案内のとおりです。まだお振込みがお済みでない方は、<strong>${CAMP_PAYMENT_DEADLINE}</strong>までにお願いいたします。`)}
+    ${p('<strong>宿泊費・食事代</strong> — 当日、<strong>TAKIVIVA受付にて直接ご精算</strong>いただきます（現金・クレジットカード等）。確定金額は当日受付でご案内します。')}
+    ${p('なお、ご自宅から通われる方・宿泊されない方が数名いらっしゃいます。その場合の食事代の精算方法も当日受付でご案内できるよう、会場と調整しています。')}
+
+    ${h2('お食事について')}
+    ${p('1日目の昼・夕、2日目の朝・昼の計4回、TAKIVIVA でご用意します。夕食と朝食は地域の食材を活かして厨房で調理され、ランチは外部手配のお弁当です。')}
+    ${p(`アレルギーや食事制限のあるお申し出は会場に共有済みです。<strong>お申込み後に体調や食事制限に変化があった方は、${CAMP_PAYMENT_DEADLINE}までにこのメールへの返信でお知らせください。</strong>`)}
+    ${p('厨房を共有して調理する都合上、お一人分だけ食材を抜いた別料理をご用意することが難しい場合があります。使用食材はできる限りお伝えしますので、最終的にはご自身でご判断いただき、必要に応じて別途お食事をご用意いただく形になる可能性があります。あらかじめご了承ください。')}
+
+    ${h2('2日間の流れ')}
+    <p style="margin:0 0 10px;font-size:13px;color:#475569;line-height:1.9;">
+      <strong style="color:#1c3329;">1日目（8/11 火）</strong><br>
+      10:00 チェックイン ／ 10:30 オープニング ／ 12:00 ランチ ／ 13:30 好奇心筋・傾聴筋・共感筋 ／ 15:50 勇気筋・意見筋・反対意見表明筋 ／ 18:30 夕食 ／ 20:00 焚き火対話（自由参加）
+    </p>
+    <p style="margin:0 0 14px;font-size:13px;color:#475569;line-height:1.9;">
+      <strong style="color:#1c3329;">2日目（8/12 水）</strong><br>
+      7:00 朝の散歩 ／ 8:00 朝食 ／ 9:30 言葉への自信筋・妥協筋 ／ 12:00 ランチ ／ 13:30 活動家筋・動員筋 ／ 15:30 統合ワーク ／ 16:30 クロージング（17:00 解散）
+    </p>
+    ${p('夜の焚き火対話は自由参加です。ゆっくり休まれても構いません。')}
+
+    ${h2('1ヶ月後のオンラインセッションについて')}
+    ${p('合宿から1ヶ月ほど後に、Zoom で2時間の振り返りセッションを行います（参加費に含まれます）。日程は皆さんと調整して決めますので、<strong>合宿当日に候補日をご相談させてください。</strong>')}
+
+    ${h2('当日までのご連絡')}
+    ${p('ご質問・ご相談は、このメールへの返信または <a href="mailto:y.morimoto@kizukikumitate.com" style="color:#e85d26;">y.morimoto@kizukikumitate.com</a> までお気軽にどうぞ。開催前日にも、あらためて当日のご案内をお送りします。')}
+    ${p('森の中で皆さんにお会いできるのを楽しみにしています。')}
+  </td></tr>
+
+  <tr><td style="background:#26215C;border-radius:0 0 12px 12px;padding:22px 32px;text-align:center;">
+    <p style="margin:0 0 4px;font-size:13px;font-weight:600;color:#ffffff;">株式会社きづきくみたてワンダーラボ　森本 康仁</p>
+    <p style="margin:0;font-size:11px;color:rgba(255,255,255,0.7);">
+      <a href="mailto:y.morimoto@kizukikumitate.com" style="color:rgba(255,255,255,0.7);text-decoration:none;">y.morimoto@kizukikumitate.com</a> ／ 070-2810-2677
+    </p>
+  </td></tr>
+
+</table>
+</td></tr>
+</table>
+</body>
+</html>`;
 }
