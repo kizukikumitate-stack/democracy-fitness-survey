@@ -7,6 +7,9 @@ import { createSupabaseAdminClient } from '@/lib/supabaseAdmin';
 //   mode='count'  : 送信せず、対象人数と宛先一覧だけ返す（確認用）
 //   mode='test'   : testEmail（または管理者）宛に1通だけ送る（プレビュー用）
 //   mode='send'   : 申込者全員に送る（本番）
+// 任意パラメータ:
+//   template   : 同じイベントの2通目以降を選ぶ（NAMED_TEMPLATES のキー）
+//   onlyEmail  : send 時、その1名だけに送る（後から申し込んだ人への追い送り）
 
 const FROM_EMAIL = process.env.RESEND_FROM_EMAIL ?? 'onboarding@resend.dev';
 const ADMIN_NOTIFY_EMAIL = process.env.RESEND_ADMIN_EMAIL ?? 'y.morimoto@kizukikumitate.com';
@@ -55,8 +58,8 @@ export async function POST(req: NextRequest) {
   if (!body || typeof body !== 'object') {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
-  const { event_id, mode, testEmail, template: templateKey } = body as {
-    event_id?: unknown; mode?: unknown; testEmail?: unknown; template?: unknown;
+  const { event_id, mode, testEmail, template: templateKey, onlyEmail } = body as {
+    event_id?: unknown; mode?: unknown; testEmail?: unknown; template?: unknown; onlyEmail?: unknown;
   };
 
   if (typeof event_id !== 'string') {
@@ -142,14 +145,29 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ tested: true, to }, { status: 200 });
   }
 
-  // mode='send' は全員へ（Resend batch を100件ずつ）
-  if (recipients.length === 0) {
+  // onlyEmail 指定時はその1名だけに送る（後から申し込んだ人への追い送り用）。
+  // 既に全員へ送った文面を、二重送信せずに1名へ届けたいときに使う。
+  // 申込者一覧にないアドレスは弾く（宛先の打ち間違い・部外者への誤送信を防ぐ）。
+  let targets = recipients;
+  if (typeof onlyEmail === 'string' && onlyEmail.trim()) {
+    const wanted = onlyEmail.toLowerCase().trim();
+    targets = recipients.filter(r => r.email === wanted);
+    if (targets.length === 0) {
+      return NextResponse.json(
+        { error: 'not_a_signup', message: `${wanted} はこのイベントの申込者一覧にありません` },
+        { status: 400 },
+      );
+    }
+  }
+
+  // mode='send' は対象者へ（Resend batch を100件ずつ）
+  if (targets.length === 0) {
     return NextResponse.json({ sent: 0, failed: 0, message: '対象の申込者がいません' }, { status: 200 });
   }
   let sent = 0;
   let failed = 0;
-  for (let i = 0; i < recipients.length; i += 100) {
-    const chunk = recipients.slice(i, i + 100);
+  for (let i = 0; i < targets.length; i += 100) {
+    const chunk = targets.slice(i, i + 100);
     const payload = chunk.map(r => ({
       from: FROM_EMAIL,
       to: r.email,
@@ -165,7 +183,7 @@ export async function POST(req: NextRequest) {
       sent += chunk.length;
     }
   }
-  return NextResponse.json({ sent, failed, total: recipients.length }, { status: 200 });
+  return NextResponse.json({ sent, failed, total: targets.length }, { status: 200 });
 }
 
 // =============================================================
