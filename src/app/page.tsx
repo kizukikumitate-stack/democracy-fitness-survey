@@ -394,7 +394,7 @@ export default function AdminPage() {
               <span className="text-white text-sm font-bold">10</span>
             </div>
             <h3 className="font-semibold text-blue-800 mb-1">10の筋肉</h3>
-            <p className="text-blue-700 text-xs">好奇心、傾聴、共感、勇気、意見、反対意見、言葉への自信、妥協、活動家、動員</p>
+            <p className="text-blue-700 text-xs">好奇心、傾聴、共感、勇気、意見、意見の違い、自信を持って伝える、良い妥協、行動、巻き込み</p>
           </div>
           <div className="bg-green-50 border border-green-100 rounded-xl p-4">
             <div className="w-8 h-8 bg-green-600 rounded-lg flex items-center justify-center mb-3">

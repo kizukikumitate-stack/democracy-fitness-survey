@@ -18,11 +18,11 @@ export const MUSCLES: Muscle[] = [
   { index: 2, name: '共感', nameEn: 'Empathy' },
   { index: 3, name: '勇気', nameEn: 'Courage' },
   { index: 4, name: '意見', nameEn: 'Opinion' },
-  { index: 5, name: '反対意見', nameEn: 'Disagreement' },
-  { index: 6, name: '言葉への自信', nameEn: 'Verbal Self-Confidence' },
-  { index: 7, name: '妥協', nameEn: 'Compromising' },
-  { index: 8, name: '活動家', nameEn: 'Activist' },
-  { index: 9, name: '動員', nameEn: 'Mobilization' },
+  { index: 5, name: '意見の違い', nameEn: 'Disagreement' },
+  { index: 6, name: '自信を持って伝える', nameEn: 'Verbal Self-Confidence' },
+  { index: 7, name: '良い妥協', nameEn: 'Compromising' },
+  { index: 8, name: '行動', nameEn: 'Activist' },
+  { index: 9, name: '巻き込み', nameEn: 'Mobilization' },
 ];
 
 export const QUESTIONS: Question[] = [
@@ -66,7 +66,7 @@ export const QUESTIONS: Question[] = [
   { id: 'Q5-5', muscleIndex: 4, layer: 2, text: '「どちらでもいいです」「上の決定に従います」という回答が多い', reversed: true },
   { id: 'Q5-6', muscleIndex: 4, layer: 2, text: '自分の立場を明確にして発言することが評価される文化がある', reversed: false },
 
-  // 6. 反対意見
+  // 6. 意見の違い
   { id: 'Q6-1', muscleIndex: 5, layer: 1, text: '相手の意見に反対するとき、感情的にならず建設的に伝えている', reversed: false },
   { id: 'Q6-2', muscleIndex: 5, layer: 1, text: '「反対のための反対」ではなく、より良くするための異議を述べている', reversed: false },
   { id: 'Q6-3', muscleIndex: 5, layer: 1, text: '反対意見を言った後も、相手との関係を壊さずにいる', reversed: false },
@@ -74,7 +74,7 @@ export const QUESTIONS: Question[] = [
   { id: 'Q6-5', muscleIndex: 5, layer: 2, text: '決定事項への反論が、後になってではなく議論の場で出てくる', reversed: false },
   { id: 'Q6-6', muscleIndex: 5, layer: 2, text: '表向きは賛成しておいて、後から陰で不満が出ることが多い', reversed: true },
 
-  // 7. 言葉への自信
+  // 7. 自信を持って伝える
   { id: 'Q7-1', muscleIndex: 6, layer: 1, text: '上司や経営層がいる場でも、自分の意見を発言している', reversed: false },
   { id: 'Q7-2', muscleIndex: 6, layer: 1, text: '自分の考えを、相手にわかるように言語化して伝えている', reversed: false },
   { id: 'Q7-3', muscleIndex: 6, layer: 1, text: '自分の意見が少数派でも、発言することを躊躇わない', reversed: false },
@@ -82,7 +82,7 @@ export const QUESTIONS: Question[] = [
   { id: 'Q7-5', muscleIndex: 6, layer: 2, text: '発言した内容で後から不利益を受けることがない', reversed: false },
   { id: 'Q7-6', muscleIndex: 6, layer: 2, text: '会議では発言する人が固定されている', reversed: true },
 
-  // 8. 妥協
+  // 8. 良い妥協
   { id: 'Q8-1', muscleIndex: 7, layer: 1, text: '自分の意見が通らないとき、より良い解を探すために柔軟に動いている', reversed: false },
   { id: 'Q8-2', muscleIndex: 7, layer: 1, text: '対立する意見を統合して、新しい案を提案していることがある', reversed: false },
   { id: 'Q8-3', muscleIndex: 7, layer: 1, text: '合意形成のプロセスに、粘り強く参加している', reversed: false },
@@ -90,7 +90,7 @@ export const QUESTIONS: Question[] = [
   { id: 'Q8-5', muscleIndex: 7, layer: 2, text: '合意が取れるまで対話を続けるための時間が確保されている', reversed: false },
   { id: 'Q8-6', muscleIndex: 7, layer: 2, text: '声が大きい人や立場が上の人の意見に落ち着くことが多い', reversed: true },
 
-  // 9. 活動家
+  // 9. 行動
   { id: 'Q9-1', muscleIndex: 8, layer: 1, text: '組織や職場をより良くするために、自発的に行動を起こしている', reversed: false },
   { id: 'Q9-2', muscleIndex: 8, layer: 1, text: '「変えたい」と思ったことを、言葉だけでなく行動に移している', reversed: false },
   { id: 'Q9-3', muscleIndex: 8, layer: 1, text: '小さなことでも、変化を起こすための一歩を踏み出している', reversed: false },
@@ -98,7 +98,7 @@ export const QUESTIONS: Question[] = [
   { id: 'Q9-5', muscleIndex: 8, layer: 2, text: '「やってみよう」と行動に移す人が評価される', reversed: false },
   { id: 'Q9-6', muscleIndex: 8, layer: 2, text: '提案しても「前例がない」「リスクがある」と止まることが多い', reversed: true },
 
-  // 10. 動員
+  // 10. 巻き込み
   { id: 'Q10-1', muscleIndex: 9, layer: 1, text: '重要だと思うことに、他者を巻き込んで一緒に動いている', reversed: false },
   { id: 'Q10-2', muscleIndex: 9, layer: 1, text: '周囲の関心や動機を理解した上で、協力を求めている', reversed: false },
   { id: 'Q10-3', muscleIndex: 9, layer: 1, text: '一人で抱え込まず、仲間を増やして動くことを意識している', reversed: false },
@@ -157,47 +157,47 @@ export const BEHAVIORAL_QUESTION_TEXTS: Record<string, string> = {
   'Q5-5': 'この半年で、「どちらでもいいです」「上の決定に従います」という回答が多く出た場面があった',
   'Q5-6': 'この半年で、自分の立場を明確にして発言したメンバーが評価された場面があった',
 
-  // 反対意見 - 個人
+  // 意見の違い - 個人
   'Q6-1': 'この半年で、相手の意見に反対するとき感情的にならず建設的に伝えた',
   'Q6-2': 'この半年で、より良くするための建設的な異議を述べた',
   'Q6-3': 'この半年で、反対意見を言った後も相手との関係を良好に保てた',
-  // 反対意見 - 組織
+  // 意見の違い - 組織
   'Q6-4': 'この半年で、反対意見を言っても関係が壊れなかった場面があった',
   'Q6-5': 'この半年で、決定事項への反論が議論の場で出てきた場面があった',
   'Q6-6': 'この半年で、表向きは賛成しながら後から陰で不満が出た場面があった',
 
-  // 言葉への自信 - 個人
+  // 自信を持って伝える - 個人
   'Q7-1': 'この半年で、上司や経営層がいる場でも自分の意見を発言した',
   'Q7-2': 'この半年で、自分の考えを相手にわかるように言語化して伝えた',
   'Q7-3': 'この半年で、自分の意見が少数派でも躊躇わずに発言した',
-  // 言葉への自信 - 組織
+  // 自信を持って伝える - 組織
   'Q7-4': 'この半年で、役職に関係なく誰もが意見を言えた場面があった',
   'Q7-5': 'この半年で、発言した内容で後から不利益を受けた人がいなかった',
   'Q7-6': 'この半年で、会議での発言者が特定の人に偏っていた場面があった',
 
-  // 妥協 - 個人
+  // 良い妥協 - 個人
   'Q8-1': 'この半年で、自分の意見が通らなかったとき、より良い解を一緒に探した',
   'Q8-2': 'この半年で、対立する意見を統合した新しい案を提案した',
   'Q8-3': 'この半年で、合意が得られるまで粘り強く対話に参加した',
-  // 妥協 - 組織
+  // 良い妥協 - 組織
   'Q8-4': 'この半年で、意見の対立が「より良い案を探す」方向に向かった場面があった',
   'Q8-5': 'この半年で、合意が取れるまで対話を続けるための時間が確保された場面があった',
   'Q8-6': 'この半年で、声が大きい人や立場が上の人の意見に落ち着いた場面があった',
 
-  // 活動家 - 個人
+  // 行動 - 個人
   'Q9-1': 'この半年で、組織や職場をより良くするために自発的に行動を起こした',
   'Q9-2': 'この半年で、「変えたい」と思ったことを言葉だけでなく行動に移した',
   'Q9-3': 'この半年で、小さなことでも変化を起こすための一歩を踏み出した',
-  // 活動家 - 組織
+  // 行動 - 組織
   'Q9-4': 'この半年で、課題を感じたメンバーが自発的に改善を提案した場面があった',
   'Q9-5': 'この半年で、「やってみよう」と行動に移した人が実際に評価された場面があった',
   'Q9-6': 'この半年で、提案が「前例がない」「リスクがある」と止まった場面があった',
 
-  // 動員 - 個人
+  // 巻き込み - 個人
   'Q10-1': 'この半年で、重要と思うことに他者を巻き込んで一緒に動いた',
   'Q10-2': 'この半年で、周囲の関心や動機を理解した上で協力を求めた',
   'Q10-3': 'この半年で、一人で抱え込まず仲間を増やして動いた',
-  // 動員 - 組織
+  // 巻き込み - 組織
   'Q10-4': 'この半年で、変革や新しい取り組みに自発的に参加したメンバーがいた',
   'Q10-5': 'この半年で、誰かが旗を振ったとき周囲が応じて実際に動いた場面があった',
   'Q10-6': 'この半年で、「誰かがやるだろう」という傍観者意識を感じた場面があった',
@@ -241,31 +241,31 @@ export const STUDENT_QUESTIONS: Question[] = [
   { id: 'Q5-4', muscleIndex: 4, layer: 2, text: 'この場では、メンバーが理由を持って自分の意見を述べる場面が多い', reversed: false },
   { id: 'Q5-6', muscleIndex: 4, layer: 2, text: 'この場では、自分の立場をはっきりさせて発言することが受け入れられる', reversed: false },
 
-  // 6. 反対意見
+  // 6. 意見の違い
   { id: 'Q6-1', muscleIndex: 5, layer: 1, text: '相手に反対するときも、感情的にならず建設的に伝えている', reversed: false },
   { id: 'Q6-2', muscleIndex: 5, layer: 1, text: '反対意見を言った後も、相手との関係を壊さずにいられる', reversed: false },
   { id: 'Q6-4', muscleIndex: 5, layer: 2, text: 'この場では、反対意見を言っても人間関係が壊れない', reversed: false },
   { id: 'Q6-5', muscleIndex: 5, layer: 2, text: 'この場では、決定への反論が後からではなく話し合いの場で出てくる', reversed: false },
 
-  // 7. 言葉への自信
+  // 7. 自信を持って伝える
   { id: 'Q7-1', muscleIndex: 6, layer: 1, text: '先輩や教員がいる場でも、自分の意見を発言している', reversed: false },
   { id: 'Q7-2', muscleIndex: 6, layer: 1, text: '自分の考えを、相手に伝わるように言葉にできている', reversed: false },
   { id: 'Q7-4', muscleIndex: 6, layer: 2, text: 'この場では、学年や立場に関係なく誰もが意見を言える', reversed: false },
   { id: 'Q7-5', muscleIndex: 6, layer: 2, text: 'この場では、発言する人がいつも同じ数人に固定されていない', reversed: false },
 
-  // 8. 妥協
+  // 8. 良い妥協
   { id: 'Q8-1', muscleIndex: 7, layer: 1, text: '自分の意見が通らないときも、より良い案を探して柔軟に動いている', reversed: false },
   { id: 'Q8-2', muscleIndex: 7, layer: 1, text: '対立する意見を統合して、新しい案を提案することがある', reversed: false },
   { id: 'Q8-4', muscleIndex: 7, layer: 2, text: 'この場では、意見の対立が「どちらが勝つか」ではなく「より良い案を探す」方向に向かう', reversed: false },
   { id: 'Q8-5', muscleIndex: 7, layer: 2, text: 'この場では、納得いくまで話し合うための時間が取られている', reversed: false },
 
-  // 9. 活動家
+  // 9. 行動
   { id: 'Q9-1', muscleIndex: 8, layer: 1, text: '「おかしい」と思ったことは、口にするだけでなく自分から動いて変えようとしている', reversed: false },
   { id: 'Q9-2', muscleIndex: 8, layer: 1, text: '自分の関わる場をより良くするために、具体的な行動を起こしている', reversed: false },
   { id: 'Q9-4', muscleIndex: 8, layer: 2, text: 'この場では、メンバーが自分たちで課題を見つけて動くことが歓迎される', reversed: false },
   { id: 'Q9-5', muscleIndex: 8, layer: 2, text: 'この場では、「誰かがやってくれる」ではなく自分ごととして取り組む人が多い', reversed: false },
 
-  // 10. 動員
+  // 10. 巻き込み
   { id: 'Q10-1', muscleIndex: 9, layer: 1, text: '自分の考えに共感してくれる仲間を巻き込んで進めることができる', reversed: false },
   { id: 'Q10-2', muscleIndex: 9, layer: 1, text: '何かを変えたいとき、周りに声をかけて協力を集めている', reversed: false },
   { id: 'Q10-4', muscleIndex: 9, layer: 2, text: 'この場では、誰かの呼びかけに人が集まって動くことがある', reversed: false },
@@ -302,27 +302,27 @@ export const STUDENT_BEHAVIORAL_QUESTION_TEXTS: Record<string, string> = {
   'Q5-2': 'この半年で、理由を持って自分の意見を言った',
   'Q5-4': 'この半年で、この場でメンバーが理由を持って意見を述べる場面があった',
   'Q5-6': 'この半年で、この場で自分の立場をはっきり示して発言できた',
-  // 反対意見
+  // 意見の違い
   'Q6-1': 'この半年で、相手に反対するとき感情的にならず建設的に伝えた',
   'Q6-2': 'この半年で、反対意見を言った後も相手との関係を保てた',
   'Q6-4': 'この半年で、この場で反対意見を言っても人間関係が壊れなかった',
   'Q6-5': 'この半年で、この場で決定への反論が話し合いの場で出てきた',
-  // 言葉への自信
+  // 自信を持って伝える
   'Q7-1': 'この半年で、先輩や教員がいる場でも自分の意見を発言した',
   'Q7-2': 'この半年で、自分の考えを相手に伝わるように言葉にできた',
   'Q7-4': 'この半年で、この場で学年や立場に関係なく誰もが意見を言えた',
   'Q7-5': 'この半年で、この場で発言する人が特定の数人に偏らなかった',
-  // 妥協
+  // 良い妥協
   'Q8-1': 'この半年で、自分の意見が通らないときもより良い案を探して動いた',
   'Q8-2': 'この半年で、対立する意見を統合した新しい案を提案した',
   'Q8-4': 'この半年で、この場で対立が「より良い案を探す」方向に向かった',
   'Q8-5': 'この半年で、この場で納得いくまで話し合う時間が取られた',
-  // 活動家
+  // 行動
   'Q9-1': 'この半年で、「おかしい」と思ったことを自分から動いて変えようとした',
   'Q9-2': 'この半年で、関わる場をより良くするため具体的な行動を起こした',
   'Q9-4': 'この半年で、この場でメンバーが自分たちで課題を見つけて動く場面があった',
   'Q9-5': 'この半年で、この場で「誰かがやってくれる」ではなく自分ごとで取り組む人がいた',
-  // 動員
+  // 巻き込み
   'Q10-1': 'この半年で、自分の考えに共感してくれる仲間を巻き込んで進めた',
   'Q10-2': 'この半年で、何かを変えたいとき周りに声をかけて協力を集めた',
   'Q10-4': 'この半年で、この場で誰かの呼びかけに人が集まって動いた',
