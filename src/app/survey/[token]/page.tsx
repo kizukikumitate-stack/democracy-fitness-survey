@@ -186,7 +186,7 @@ export default function SurveyPage() {
     try {
       localStorage.setItem(DRAFT_KEY, JSON.stringify({ answers, respondentName, respondentEmail, respondentDate, pageState }));
     } catch { /* 無視 */ }
-  }, [answers, respondentName, respondentDate, pageState, DRAFT_KEY]);
+  }, [answers, respondentName, respondentEmail, respondentDate, pageState, DRAFT_KEY]);
 
   const handleAnswer = (id: string, score: number) => {
     setAnswers(prev => ({ ...prev, [id]: score }));
@@ -198,11 +198,13 @@ export default function SurveyPage() {
   const part1AnsweredCount = layer1Questions.filter(q => answers[q.id] !== undefined).length;
   const part2AnsweredCount = layer2Questions.filter(q => answers[q.id] !== undefined).length;
 
-  // 学生版は受講前後の変化を追うため、名前・メールを必須にする（法人版・匿名運用は任意のまま）
-  const identityRequired = isStudent;
+  // メールアドレスは全版で必須（回答者全員に結果メールを自動で届けるため）。
+  // お名前は、受講前後の変化を追う学生版だけ必須（法人版は匿名のまま回答できる）。
+  const nameRequired = isStudent;
   const nameValid = respondentName.trim().length > 0;
   const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(respondentEmail.trim());
-  const identityOk = !identityRequired || (nameValid && emailValid);
+  const identityOk = (!nameRequired || nameValid) && emailValid;
+  const identityMissingLabel = nameRequired ? 'お名前とメールアドレス' : 'メールアドレス';
 
   const handleSubmit = async () => {
     if (!identityOk) { setPageState('part1'); window.scrollTo({ top: 0, behavior: 'smooth' }); return; }
@@ -431,16 +433,16 @@ export default function SurveyPage() {
             <div className="flex flex-col sm:flex-row gap-4">
               <div className="flex-1">
                 <label className="block text-sm font-medium text-slate-700 mb-2">
-                  お名前{identityRequired ? <span className="text-red-500">（必須）</span> : '（任意）'}
+                  お名前{nameRequired ? <span className="text-red-500">（必須）</span> : '（任意）'}
                 </label>
                 <input
                   type="text"
                   value={respondentName}
                   onChange={e => setRespondentName(e.target.value)}
-                  placeholder={identityRequired ? '例：山田 太郎' : '匿名でも回答できます'}
-                  required={identityRequired}
-                  aria-invalid={identityRequired && !nameValid}
-                  className={`w-full px-4 py-2.5 border rounded-lg text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition ${identityRequired && !nameValid ? 'border-red-300' : 'border-slate-300'}`}
+                  placeholder={nameRequired ? '例：山田 太郎' : '匿名でも回答できます'}
+                  required={nameRequired}
+                  aria-invalid={nameRequired && !nameValid}
+                  className={`w-full px-4 py-2.5 border rounded-lg text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition ${nameRequired && !nameValid ? 'border-red-300' : 'border-slate-300'}`}
                 />
               </div>
               <div className="flex-1">
@@ -457,27 +459,25 @@ export default function SurveyPage() {
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">
-                メールアドレス{identityRequired ? <span className="text-red-500">（必須）</span> : '（任意）'}
+                メールアドレス<span className="text-red-500">（必須）</span>
               </label>
               <input
                 type="email"
                 value={respondentEmail}
                 onChange={e => setRespondentEmail(e.target.value)}
                 placeholder="例：taro@example.com"
-                required={identityRequired}
-                aria-invalid={identityRequired && !emailValid}
-                className={`w-full px-4 py-2.5 border rounded-lg text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition ${identityRequired && respondentEmail.trim() !== '' && !emailValid ? 'border-red-300' : 'border-slate-300'}`}
+                required
+                aria-invalid={!emailValid}
+                className={`w-full px-4 py-2.5 border rounded-lg text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition ${respondentEmail.trim() !== '' && !emailValid ? 'border-red-300' : 'border-slate-300'}`}
               />
-              {identityRequired && respondentEmail.trim() !== '' && !emailValid && (
+              {respondentEmail.trim() !== '' && !emailValid && (
                 <p className="text-xs text-red-500 mt-1.5">メールアドレスの形式が正しくありません</p>
               )}
-              {identityRequired ? (
-                <p className="text-xs text-slate-500 mt-1.5">
-                  受講前後の変化を比較するために使用します。結果もこのアドレスにお送りします。
-                </p>
-              ) : respondentEmail && (
-                <p className="text-xs text-blue-600 mt-1.5">回答送信後に結果をメールでお届けします</p>
-              )}
+              <p className="text-xs text-slate-500 mt-1.5">
+                {isStudent
+                  ? '受講前後の変化を比較するために使用します。結果もこのアドレスにお送りします。'
+                  : '回答送信後、診断結果をこのアドレスにお送りします。'}
+              </p>
             </div>
           </div>
         )}
@@ -556,7 +556,7 @@ export default function SurveyPage() {
                   </p>
                   <p className="text-xs text-slate-400">
                     {part1Answered && !identityOk
-                      ? 'お名前とメールアドレスの入力が必要です'
+                      ? `${identityMissingLabel}の入力が必要です`
                       : `次へ進むと${envLabel}になります`}
                   </p>
                 </div>
@@ -581,7 +581,7 @@ export default function SurveyPage() {
                 <div className="text-right">
                   <p className={`text-xs mb-1 ${part2Answered && !identityOk ? 'text-red-500' : 'text-slate-400'}`}>
                     {part2Answered
-                      ? (identityOk ? '全問回答済みです' : 'Part 1 でお名前とメールの入力が必要です')
+                      ? (identityOk ? '全問回答済みです' : `Part 1 で${identityMissingLabel}の入力が必要です`)
                       : `残り ${totalQuestions - currentAnsweredCount} 問`}
                   </p>
                   <button
