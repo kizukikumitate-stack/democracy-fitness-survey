@@ -22,3 +22,15 @@ export function createSupabaseAdminClient() {
     },
   })
 }
+
+// サーベイ本体(surveys / responses)を読み書きするサーバーサイド用の共有クライアント。
+// これらのテーブルは RLS が有効で anon からは1行も見えないため、
+// API ルート・サーバーコンポーネントからは必ずこちらを使う(anon クライアントは使わない)。
+let serverClient: ReturnType<typeof createSupabaseAdminClient> | null = null
+
+export function getServerSupabase() {
+  if (!serverClient) {
+    serverClient = createSupabaseAdminClient()
+  }
+  return serverClient
+}

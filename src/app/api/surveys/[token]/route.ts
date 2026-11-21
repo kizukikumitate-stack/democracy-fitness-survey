@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { getServerSupabase } from '@/lib/supabaseAdmin';
 
 export async function PATCH(
   req: NextRequest,
   { params }: { params: { token: string } }
 ) {
   try {
+    const supabase = getServerSupabase();
     const { organizationName } = await req.json();
     if (!organizationName?.trim()) {
       return NextResponse.json({ error: '組織名を入力してください' }, { status: 400 });
@@ -29,6 +30,7 @@ export async function GET(
   { params }: { params: { token: string } }
 ) {
   try {
+    const supabase = getServerSupabase();
     const { data: survey, error } = await supabase
       .from('surveys')
       .select('*')

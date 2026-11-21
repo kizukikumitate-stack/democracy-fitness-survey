@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { getServerSupabase } from '@/lib/supabaseAdmin';
 import { QUESTIONS, MUSCLES, transformScore, getQuestionSet } from '@/lib/questions';
 import { sendResultEmail } from '@/lib/sendResultEmail';
 
@@ -8,6 +8,7 @@ export async function POST(
   { params }: { params: { token: string } }
 ) {
   try {
+    const supabase = getServerSupabase();
     const { data: survey, error: surveyError } = await supabase
       .from('surveys')
       .select('*')
@@ -138,6 +139,7 @@ export async function GET(
   { params }: { params: { token: string } }
 ) {
   try {
+    const supabase = getServerSupabase();
     const { data: survey, error: surveyError } = await supabase
       .from('surveys')
       .select('*')

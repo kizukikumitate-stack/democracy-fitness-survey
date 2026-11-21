@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation';
-import { supabase } from '@/lib/supabase';
+import { getServerSupabase } from '@/lib/supabaseAdmin';
 import ResultsClient from './ResultsClient';
 
 interface Props {
@@ -8,6 +8,7 @@ interface Props {
 }
 
 export default async function ResultsPage({ params, searchParams }: Props) {
+  const supabase = getServerSupabase();
   const { data: survey, error } = await supabase
     .from('surveys')
     .select('*')

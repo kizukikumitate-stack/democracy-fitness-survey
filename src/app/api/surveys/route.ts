@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { getServerSupabase } from '@/lib/supabaseAdmin';
 
 export async function GET() {
   try {
+    const supabase = getServerSupabase();
     const { data: surveys, error } = await supabase
       .from('surveys')
       .select('*')
@@ -36,6 +37,7 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
+    const supabase = getServerSupabase();
     const body = await req.json();
     const { organizationName } = body;
 
